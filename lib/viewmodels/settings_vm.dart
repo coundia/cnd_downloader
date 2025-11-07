@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/settings.dart';
 import '../core/settings_store.dart';
@@ -13,9 +15,28 @@ class SettingsVm extends StateNotifier<RuntimeSettings> {
     _init();
   }
 
-  Future<void> _init() async {
-    final loaded = await _store.load();
-    _apply(loaded);
+  void _init() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadWithRetry());
+  }
+
+  Future<void> _loadWithRetry() async {
+    const delaysMs = [0, 150, 300, 600];
+    for (final ms in delaysMs) {
+      if (ms > 0) await Future.delayed(Duration(milliseconds: ms));
+      try {
+        final loaded = await _store.load();
+        _apply(loaded);
+        return;
+      } on PlatformException {
+        // réessaie sur macOS si le channel n’est pas prêt
+        continue;
+      } catch (_) {
+        // autre erreur: on appliquera les valeurs par défaut en fin de boucle
+        break;
+      }
+    }
+    // fallback silencieux
+    _apply(RuntimeSettings());
   }
 
   void _apply(RuntimeSettings s) {
