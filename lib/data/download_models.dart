@@ -5,7 +5,8 @@ part 'download_models.g.dart';
 @collection
 class DownloadTask {
   Id id = Isar.autoIncrement;
-  late String url;
+  late String url; // URL d’origine saisie
+  String? lastRealUrl; // URL finale résolue (après redirections)
   String? referer;
   String? userAgent;
   late String fileName;

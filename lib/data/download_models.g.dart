@@ -42,48 +42,53 @@ const DownloadTaskSchema = CollectionSchema(
       name: r'fileName',
       type: IsarType.string,
     ),
-    r'referer': PropertySchema(
+    r'lastRealUrl': PropertySchema(
       id: 5,
+      name: r'lastRealUrl',
+      type: IsarType.string,
+    ),
+    r'referer': PropertySchema(
+      id: 6,
       name: r'referer',
       type: IsarType.string,
     ),
     r'savePath': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'savePath',
       type: IsarType.string,
     ),
     r'speedBps': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'speedBps',
       type: IsarType.double,
     ),
     r'state': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'state',
       type: IsarType.string,
     ),
     r'tempPath': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'tempPath',
       type: IsarType.string,
     ),
     r'total': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'total',
       type: IsarType.long,
     ),
     r'updatedAt': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
     r'url': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'url',
       type: IsarType.string,
     ),
     r'userAgent': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'userAgent',
       type: IsarType.string,
     )
@@ -109,6 +114,12 @@ int _downloadTaskEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.fileName.length * 3;
+  {
+    final value = object.lastRealUrl;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   {
     final value = object.referer;
     if (value != null) {
@@ -139,15 +150,16 @@ void _downloadTaskSerialize(
   writer.writeLong(offsets[2], object.downloaded);
   writer.writeLong(offsets[3], object.etaSeconds);
   writer.writeString(offsets[4], object.fileName);
-  writer.writeString(offsets[5], object.referer);
-  writer.writeString(offsets[6], object.savePath);
-  writer.writeDouble(offsets[7], object.speedBps);
-  writer.writeString(offsets[8], object.state);
-  writer.writeString(offsets[9], object.tempPath);
-  writer.writeLong(offsets[10], object.total);
-  writer.writeDateTime(offsets[11], object.updatedAt);
-  writer.writeString(offsets[12], object.url);
-  writer.writeString(offsets[13], object.userAgent);
+  writer.writeString(offsets[5], object.lastRealUrl);
+  writer.writeString(offsets[6], object.referer);
+  writer.writeString(offsets[7], object.savePath);
+  writer.writeDouble(offsets[8], object.speedBps);
+  writer.writeString(offsets[9], object.state);
+  writer.writeString(offsets[10], object.tempPath);
+  writer.writeLong(offsets[11], object.total);
+  writer.writeDateTime(offsets[12], object.updatedAt);
+  writer.writeString(offsets[13], object.url);
+  writer.writeString(offsets[14], object.userAgent);
 }
 
 DownloadTask _downloadTaskDeserialize(
@@ -163,15 +175,16 @@ DownloadTask _downloadTaskDeserialize(
   object.etaSeconds = reader.readLong(offsets[3]);
   object.fileName = reader.readString(offsets[4]);
   object.id = id;
-  object.referer = reader.readStringOrNull(offsets[5]);
-  object.savePath = reader.readString(offsets[6]);
-  object.speedBps = reader.readDouble(offsets[7]);
-  object.state = reader.readString(offsets[8]);
-  object.tempPath = reader.readString(offsets[9]);
-  object.total = reader.readLong(offsets[10]);
-  object.updatedAt = reader.readDateTime(offsets[11]);
-  object.url = reader.readString(offsets[12]);
-  object.userAgent = reader.readStringOrNull(offsets[13]);
+  object.lastRealUrl = reader.readStringOrNull(offsets[5]);
+  object.referer = reader.readStringOrNull(offsets[6]);
+  object.savePath = reader.readString(offsets[7]);
+  object.speedBps = reader.readDouble(offsets[8]);
+  object.state = reader.readString(offsets[9]);
+  object.tempPath = reader.readString(offsets[10]);
+  object.total = reader.readLong(offsets[11]);
+  object.updatedAt = reader.readDateTime(offsets[12]);
+  object.url = reader.readString(offsets[13]);
+  object.userAgent = reader.readStringOrNull(offsets[14]);
   return object;
 }
 
@@ -195,20 +208,22 @@ P _downloadTaskDeserializeProp<P>(
     case 5:
       return (reader.readStringOrNull(offset)) as P;
     case 6:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readDouble(offset)) as P;
-    case 8:
       return (reader.readString(offset)) as P;
+    case 8:
+      return (reader.readDouble(offset)) as P;
     case 9:
       return (reader.readString(offset)) as P;
     case 10:
-      return (reader.readLong(offset)) as P;
-    case 11:
-      return (reader.readDateTime(offset)) as P;
-    case 12:
       return (reader.readString(offset)) as P;
+    case 11:
+      return (reader.readLong(offset)) as P;
+    case 12:
+      return (reader.readDateTime(offset)) as P;
     case 13:
+      return (reader.readString(offset)) as P;
+    case 14:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -672,6 +687,160 @@ extension DownloadTaskQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'lastRealUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'lastRealUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastRealUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastRealUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastRealUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastRealUrl',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'lastRealUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'lastRealUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'lastRealUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'lastRealUrl',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastRealUrl',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      lastRealUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'lastRealUrl',
+        value: '',
       ));
     });
   }
@@ -1770,6 +1939,19 @@ extension DownloadTaskQuerySortBy
     });
   }
 
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> sortByLastRealUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRealUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy>
+      sortByLastRealUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRealUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> sortByReferer() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'referer', Sort.asc);
@@ -1956,6 +2138,19 @@ extension DownloadTaskQuerySortThenBy
     });
   }
 
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> thenByLastRealUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRealUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy>
+      thenByLastRealUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastRealUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> thenByReferer() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'referer', Sort.asc);
@@ -2098,6 +2293,13 @@ extension DownloadTaskQueryWhereDistinct
     });
   }
 
+  QueryBuilder<DownloadTask, DownloadTask, QDistinct> distinctByLastRealUrl(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastRealUrl', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<DownloadTask, DownloadTask, QDistinct> distinctByReferer(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -2194,6 +2396,12 @@ extension DownloadTaskQueryProperty
   QueryBuilder<DownloadTask, String, QQueryOperations> fileNameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'fileName');
+    });
+  }
+
+  QueryBuilder<DownloadTask, String?, QQueryOperations> lastRealUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastRealUrl');
     });
   }
 

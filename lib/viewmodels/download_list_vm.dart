@@ -6,6 +6,7 @@ import '../services/downloader_service.dart';
 final repositoryProvider = Provider<DownloadRepository>(
   (ref) => DownloadRepository(),
 );
+
 final downloaderProvider = Provider<DownloaderService>(
   (ref) => DownloaderService.create(ref.read(repositoryProvider)),
 );
@@ -37,6 +38,15 @@ class DownloadListVm extends StateNotifier<AsyncValue<void>> {
   Future<void> pause(int id) => service.pause(id);
   Future<void> delete(int id) => service.cancel(id);
   Future<void> retry(int id) => service.retry(id);
+  Future<void> fullRetry(int id) async {
+    state = const AsyncLoading();
+    try {
+      await service.fullRetry(id);
+      state = const AsyncData(null);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
+  }
 
   Future<void> verify(int id) => service.verify(id);
   Future<void> open(int id) => service.openFile(id);

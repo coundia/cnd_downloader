@@ -162,9 +162,15 @@ class _DownloadTile extends ConsumerWidget {
             ),
           if (task.state == 'error')
             IconButton(
-              onPressed: () => vm.retry(task.id),
+              tooltip: 'Retry (real URL)',
+              onPressed: () => vm.retry(task.id), // garde lastRealUrl
               icon: const Icon(Icons.refresh),
             ),
+          IconButton(
+            tooltip: 'Full retry (origin URL)',
+            onPressed: () => vm.fullRetry(task.id), // force URL d’origine
+            icon: const Icon(Icons.refresh_outlined),
+          ),
           IconButton(
             onPressed: () => vm.delete(task.id),
             icon: const Icon(Icons.delete_forever),
