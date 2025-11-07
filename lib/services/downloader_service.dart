@@ -259,4 +259,6 @@ class DownloaderService {
     _lastTime[t.id] = now;
     _lastBytes[t.id] = t.downloaded;
   }
+
+  Future<void> retry(int id) async {}
 }

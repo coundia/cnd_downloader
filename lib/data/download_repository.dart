@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:isar/isar.dart';
 import 'db.dart';
 import 'download_models.dart';
@@ -7,17 +6,12 @@ class DownloadRepository {
   final Isar _isar = AppDb.isar;
 
   Stream<List<DownloadTask>> watchAll() {
-    final q = _isar.downloadTasks.where();
-    final ctrl = StreamController<List<DownloadTask>>();
-    void emit() async {
-      final list = await q.findAll();
-      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      ctrl.add(list);
-    }
-
-    final sub = q.watchLazy(fireImmediately: true).listen((_) => emit());
-    ctrl.onCancel = () => sub.cancel();
-    return ctrl.stream;
+    return _isar.downloadTasks
+        .where()
+        .watch(fireImmediately: true)
+        .map(
+          (list) => (list..sort((a, b) => b.updatedAt.compareTo(a.updatedAt))),
+        );
   }
 
   Future<DownloadTask?> getTask(int id) => _isar.downloadTasks.get(id);
@@ -65,6 +59,31 @@ class DownloadRepository {
           .findAll();
       await _isar.downloadParts.deleteAll(ids);
       await _isar.downloadTasks.delete(taskId);
+      final logIds = await _isar.downloadLogs
+          .filter()
+          .taskIdEqualTo(taskId)
+          .idProperty()
+          .findAll();
+      await _isar.downloadLogs.deleteAll(logIds);
     });
+  }
+
+  Future<void> addLog(int taskId, String level, String message) async {
+    final log = DownloadLog()
+      ..taskId = taskId
+      ..ts = DateTime.now()
+      ..level = level
+      ..message = message;
+    await _isar.writeTxn(() async {
+      await _isar.downloadLogs.put(log);
+    });
+  }
+
+  Stream<List<DownloadLog>> watchLogs(int taskId) {
+    return _isar.downloadLogs
+        .filter()
+        .taskIdEqualTo(taskId)
+        .sortByTs()
+        .watch(fireImmediately: true);
   }
 }

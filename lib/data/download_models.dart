@@ -31,3 +31,12 @@ class DownloadPart {
   int downloaded = 0;
   String state = 'idle';
 }
+
+@collection
+class DownloadLog {
+  Id id = Isar.autoIncrement;
+  late int taskId;
+  late DateTime ts;
+  late String level;
+  late String message;
+}

@@ -10,6 +10,7 @@ class AppDb {
     _isar = await Isar.open([
       DownloadTaskSchema,
       DownloadPartSchema,
+      DownloadLogSchema,
     ], directory: dir.path);
     return _isar!;
   }

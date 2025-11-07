@@ -3182,3 +3182,809 @@ extension DownloadPartQueryProperty
     });
   }
 }
+
+// coverage:ignore-file
+// ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
+
+extension GetDownloadLogCollection on Isar {
+  IsarCollection<DownloadLog> get downloadLogs => this.collection();
+}
+
+const DownloadLogSchema = CollectionSchema(
+  name: r'DownloadLog',
+  id: 7901839366697521484,
+  properties: {
+    r'level': PropertySchema(
+      id: 0,
+      name: r'level',
+      type: IsarType.string,
+    ),
+    r'message': PropertySchema(
+      id: 1,
+      name: r'message',
+      type: IsarType.string,
+    ),
+    r'taskId': PropertySchema(
+      id: 2,
+      name: r'taskId',
+      type: IsarType.long,
+    ),
+    r'ts': PropertySchema(
+      id: 3,
+      name: r'ts',
+      type: IsarType.dateTime,
+    )
+  },
+  estimateSize: _downloadLogEstimateSize,
+  serialize: _downloadLogSerialize,
+  deserialize: _downloadLogDeserialize,
+  deserializeProp: _downloadLogDeserializeProp,
+  idName: r'id',
+  indexes: {},
+  links: {},
+  embeddedSchemas: {},
+  getId: _downloadLogGetId,
+  getLinks: _downloadLogGetLinks,
+  attach: _downloadLogAttach,
+  version: '3.1.0+1',
+);
+
+int _downloadLogEstimateSize(
+  DownloadLog object,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  var bytesCount = offsets.last;
+  bytesCount += 3 + object.level.length * 3;
+  bytesCount += 3 + object.message.length * 3;
+  return bytesCount;
+}
+
+void _downloadLogSerialize(
+  DownloadLog object,
+  IsarWriter writer,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  writer.writeString(offsets[0], object.level);
+  writer.writeString(offsets[1], object.message);
+  writer.writeLong(offsets[2], object.taskId);
+  writer.writeDateTime(offsets[3], object.ts);
+}
+
+DownloadLog _downloadLogDeserialize(
+  Id id,
+  IsarReader reader,
+  List<int> offsets,
+  Map<Type, List<int>> allOffsets,
+) {
+  final object = DownloadLog();
+  object.id = id;
+  object.level = reader.readString(offsets[0]);
+  object.message = reader.readString(offsets[1]);
+  object.taskId = reader.readLong(offsets[2]);
+  object.ts = reader.readDateTime(offsets[3]);
+  return object;
+}
+
+P _downloadLogDeserializeProp<P>(
+  IsarReader reader,
+  int propertyId,
+  int offset,
+  Map<Type, List<int>> allOffsets,
+) {
+  switch (propertyId) {
+    case 0:
+      return (reader.readString(offset)) as P;
+    case 1:
+      return (reader.readString(offset)) as P;
+    case 2:
+      return (reader.readLong(offset)) as P;
+    case 3:
+      return (reader.readDateTime(offset)) as P;
+    default:
+      throw IsarError('Unknown property with id $propertyId');
+  }
+}
+
+Id _downloadLogGetId(DownloadLog object) {
+  return object.id;
+}
+
+List<IsarLinkBase<dynamic>> _downloadLogGetLinks(DownloadLog object) {
+  return [];
+}
+
+void _downloadLogAttach(
+    IsarCollection<dynamic> col, Id id, DownloadLog object) {
+  object.id = id;
+}
+
+extension DownloadLogQueryWhereSort
+    on QueryBuilder<DownloadLog, DownloadLog, QWhere> {
+  QueryBuilder<DownloadLog, DownloadLog, QAfterWhere> anyId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+}
+
+extension DownloadLogQueryWhere
+    on QueryBuilder<DownloadLog, DownloadLog, QWhereClause> {
+  QueryBuilder<DownloadLog, DownloadLog, QAfterWhereClause> idEqualTo(Id id) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(
+        lower: id,
+        upper: id,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterWhereClause> idNotEqualTo(
+      Id id) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            )
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            );
+      } else {
+        return query
+            .addWhereClause(
+              IdWhereClause.greaterThan(lower: id, includeLower: false),
+            )
+            .addWhereClause(
+              IdWhereClause.lessThan(upper: id, includeUpper: false),
+            );
+      }
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterWhereClause> idGreaterThan(Id id,
+      {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.greaterThan(lower: id, includeLower: include),
+      );
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterWhereClause> idLessThan(Id id,
+      {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        IdWhereClause.lessThan(upper: id, includeUpper: include),
+      );
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterWhereClause> idBetween(
+    Id lowerId,
+    Id upperId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IdWhereClause.between(
+        lower: lowerId,
+        includeLower: includeLower,
+        upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+}
+
+extension DownloadLogQueryFilter
+    on QueryBuilder<DownloadLog, DownloadLog, QFilterCondition> {
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> idEqualTo(
+      Id value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> idGreaterThan(
+    Id value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> idLessThan(
+    Id value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'id',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> idBetween(
+    Id lower,
+    Id upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> levelEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'level',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition>
+      levelGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'level',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> levelLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'level',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> levelBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'level',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> levelStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'level',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> levelEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'level',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> levelContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'level',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> levelMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'level',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> levelIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'level',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition>
+      levelIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'level',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> messageEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'message',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition>
+      messageGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'message',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> messageLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'message',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> messageBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'message',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition>
+      messageStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'message',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> messageEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'message',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> messageContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'message',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> messageMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'message',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition>
+      messageIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'message',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition>
+      messageIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'message',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> taskIdEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'taskId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition>
+      taskIdGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'taskId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> taskIdLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'taskId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> taskIdBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'taskId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> tsEqualTo(
+      DateTime value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ts',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> tsGreaterThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'ts',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> tsLessThan(
+    DateTime value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'ts',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterFilterCondition> tsBetween(
+    DateTime lower,
+    DateTime upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'ts',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+}
+
+extension DownloadLogQueryObject
+    on QueryBuilder<DownloadLog, DownloadLog, QFilterCondition> {}
+
+extension DownloadLogQueryLinks
+    on QueryBuilder<DownloadLog, DownloadLog, QFilterCondition> {}
+
+extension DownloadLogQuerySortBy
+    on QueryBuilder<DownloadLog, DownloadLog, QSortBy> {
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> sortByLevel() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'level', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> sortByLevelDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'level', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> sortByMessage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'message', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> sortByMessageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'message', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> sortByTaskId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taskId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> sortByTaskIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taskId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> sortByTs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ts', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> sortByTsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ts', Sort.desc);
+    });
+  }
+}
+
+extension DownloadLogQuerySortThenBy
+    on QueryBuilder<DownloadLog, DownloadLog, QSortThenBy> {
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenById() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenByIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenByLevel() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'level', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenByLevelDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'level', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenByMessage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'message', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenByMessageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'message', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenByTaskId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taskId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenByTaskIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'taskId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenByTs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ts', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QAfterSortBy> thenByTsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ts', Sort.desc);
+    });
+  }
+}
+
+extension DownloadLogQueryWhereDistinct
+    on QueryBuilder<DownloadLog, DownloadLog, QDistinct> {
+  QueryBuilder<DownloadLog, DownloadLog, QDistinct> distinctByLevel(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'level', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QDistinct> distinctByMessage(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'message', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QDistinct> distinctByTaskId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'taskId');
+    });
+  }
+
+  QueryBuilder<DownloadLog, DownloadLog, QDistinct> distinctByTs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'ts');
+    });
+  }
+}
+
+extension DownloadLogQueryProperty
+    on QueryBuilder<DownloadLog, DownloadLog, QQueryProperty> {
+  QueryBuilder<DownloadLog, int, QQueryOperations> idProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<DownloadLog, String, QQueryOperations> levelProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'level');
+    });
+  }
+
+  QueryBuilder<DownloadLog, String, QQueryOperations> messageProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'message');
+    });
+  }
+
+  QueryBuilder<DownloadLog, int, QQueryOperations> taskIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'taskId');
+    });
+  }
+
+  QueryBuilder<DownloadLog, DateTime, QQueryOperations> tsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'ts');
+    });
+  }
+}

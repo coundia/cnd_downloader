@@ -46,10 +46,6 @@ class DownloadTile extends StatelessWidget {
               onPressed: () => vm.start(task.id),
               icon: const Icon(Icons.play_arrow),
             ),
-          IconButton(
-            onPressed: () => vm.cancel(task.id),
-            icon: const Icon(Icons.cancel),
-          ),
         ],
       ),
     );

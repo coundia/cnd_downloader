@@ -18,7 +18,7 @@ class DownloadListVm extends StateNotifier<AsyncValue<void>> {
   final DownloaderService service;
   DownloadListVm(this.service) : super(const AsyncValue.data(null));
 
-  Future<void> addAndStart(
+  Future<void> addOnly(
     String url,
     String dir, {
     String? referer,
@@ -26,13 +26,7 @@ class DownloadListVm extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncValue.loading();
     try {
-      final id = await service.addTask(
-        url,
-        dir,
-        referer: referer,
-        userAgent: userAgent,
-      );
-      await service.start(id);
+      await service.addTask(url, dir, referer: referer, userAgent: userAgent);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -41,7 +35,8 @@ class DownloadListVm extends StateNotifier<AsyncValue<void>> {
 
   Future<void> start(int id) => service.start(id);
   Future<void> pause(int id) => service.pause(id);
-  Future<void> cancel(int id) => service.cancel(id);
+  Future<void> delete(int id) => service.cancel(id);
+  Future<void> retry(int id) => service.retry(id);
 }
 
 final listVmProvider = StateNotifierProvider<DownloadListVm, AsyncValue<void>>(
