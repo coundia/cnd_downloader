@@ -12,11 +12,28 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final vm = ref.watch(listVmProvider.notifier);
+    ref.listen<AsyncValue<void>>(listVmProvider, (prev, next) {
+      next.whenOrNull(
+        error: (e, _) => ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e'))),
+      );
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('FastDown'),
         actions: [
+          IconButton(
+            tooltip: 'Quick add',
+            onPressed: () async {
+              final dir = await defaultDownloadDir();
+              await ref
+                  .read(listVmProvider.notifier)
+                  .addOnly('https://speed.hetzner.de/10MB.bin', dir);
+            },
+            icon: const Icon(Icons.add_to_queue),
+          ),
           IconButton(
             onPressed: () => Navigator.push(
               context,
@@ -30,7 +47,7 @@ class HomePage extends ConsumerWidget {
           .watch(downloadListProvider)
           .when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Center(child: Text('Error')),
+            error: (_, __) => const Center(child: Text('Error loading')),
             data: (tasks) => tasks.isEmpty
                 ? const Center(child: Text('No downloads'))
                 : ListView.separated(
@@ -45,6 +62,7 @@ class HomePage extends ConsumerWidget {
           if (urls == null || urls.isEmpty) return;
           String? dir = await FilePicker.platform.getDirectoryPath();
           dir ??= await defaultDownloadDir();
+          final vm = ref.read(listVmProvider.notifier);
           for (final u in urls) {
             await vm.addOnly(u, dir);
           }
@@ -134,6 +152,7 @@ class _DownloadTile extends ConsumerWidget {
         spacing: 8,
         children: [
           IconButton(
+            tooltip: 'Logs',
             onPressed: () => showModalBottomSheet(
               context: context,
               showDragHandle: true,

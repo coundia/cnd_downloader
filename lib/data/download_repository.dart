@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:isar/isar.dart';
 import 'db.dart';
 import 'download_models.dart';
@@ -7,17 +6,12 @@ class DownloadRepository {
   final Isar _isar = AppDb.isar;
 
   Stream<List<DownloadTask>> watchAll() {
-    final q = _isar.downloadTasks.where();
-    final ctrl = StreamController<List<DownloadTask>>();
-    Future<void> emit() async {
-      final list = await q.findAll();
-      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      ctrl.add(list);
-    }
-
-    final sub = q.watchLazy(fireImmediately: true).listen((_) => emit());
-    ctrl.onCancel = () => sub.cancel();
-    return ctrl.stream;
+    return _isar.downloadTasks
+        .where()
+        .watch(fireImmediately: true)
+        .map(
+          (list) => (list..sort((a, b) => b.updatedAt.compareTo(a.updatedAt))),
+        );
   }
 
   Future<DownloadTask?> getTask(int id) => _isar.downloadTasks.get(id);
