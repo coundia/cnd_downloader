@@ -320,6 +320,8 @@ class DownloaderService {
     task.state = 'running';
     await _repo.upsertTask(task);
     await _repo.addLog(task.id, 'info', 'start single');
+    await _repo.addLog(task.id, 'info', task.url);
+    await _repo.addLog(task.id, 'info', task.speedBps.toString());
 
     final resp = await _dio.get(task.url, options: options, cancelToken: token);
     final cl = int.tryParse(resp.headers.value('content-length') ?? '');
