@@ -43,11 +43,11 @@ class SegmentWorker {
     if (resp.statusCode != 206 && resp.statusCode != 200) {
       throw HttpException('seg ${resp.statusCode}');
     }
-    final stream = resp.data.stream;
-    final raf = await File(s.path).open(mode: FileMode.write);
+    final Stream<List<int>> stream = resp.data.stream;
+    final raf = await File(s.path).open(mode: FileMode.writeOnly);
     await raf.setPosition(s.start);
     int c = 0;
-    await for (final chunk in stream) {
+    await for (final List<int> chunk in stream) {
       await raf.writeFrom(chunk);
       c += chunk.length;
       onChunk(chunk.length);

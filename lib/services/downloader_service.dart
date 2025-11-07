@@ -180,13 +180,13 @@ class DownloaderService {
     task.state = 'running';
     await _repo.upsertTask(task);
     final resp = await _dio.get(task.url, options: options, cancelToken: token);
-    final stream = resp.data.stream;
+    final Stream<List<int>> stream = resp.data.stream;
     final raf = await File(task.tempPath).open(mode: FileMode.write);
     final t0 = DateTime.now();
     int done = 0;
-    await for (final chunk in stream) {
+    await for (final List<int> chunk in stream) {
       await raf.writeFrom(chunk);
-      done += chunk.length!;
+      done += chunk.length;
       task.downloaded = done;
       _updateSpeed(task, baseTime: t0, baseBytes: 0);
       await _repo.upsertTask(task);
@@ -206,8 +206,10 @@ class DownloaderService {
     int partSize,
   ) async {
     final exist = await _repo.partsForTask(t.id);
-    if (exist.isNotEmpty)
-      return exist..sort((a, b) => a.index.compareTo(b.index));
+    if (exist.isNotEmpty) {
+      exist.sort((a, b) => a.index.compareTo(b.index));
+      return exist;
+    }
     final count = max(1, min(segments, (t.total / partSize).ceil()));
     final parts = <DownloadPart>[];
     int start = 0;

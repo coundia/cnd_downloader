@@ -11,7 +11,8 @@ class DownloadRepository {
     final ctrl = StreamController<List<DownloadTask>>();
     void emit() async {
       final list = await q.findAll();
-      ctrl.add(list..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)));
+      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      ctrl.add(list);
     }
 
     final sub = q.watchLazy(fireImmediately: true).listen((_) => emit());
