@@ -1,3 +1,5 @@
+// lib/services/downloader_service.dart
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -58,7 +60,6 @@ class DownloaderService {
     final name = _fileNameFromUrl(url);
     final t = DownloadTask()
       ..url = url
-      ..lastRealUrl = null
       ..referer = referer ?? settings.defaultReferer
       ..userAgent = userAgent ?? settings.defaultUserAgent
       ..fileName = name
@@ -72,28 +73,18 @@ class DownloaderService {
     return id;
   }
 
-  // preferReal: si true, on sonde d’abord lastRealUrl si dispo, sinon url d’origine
-  Future<void> start(
-    int taskId, {
-    bool preferReal = true,
-    int? segments,
-    int? partSize,
-  }) async {
+  Future<void> start(int taskId, {int? segments, int? partSize}) async {
     final t = await _repo.getTask(taskId);
     if (t == null) return;
     if (t.state == 'completed') return;
 
-    final probeUrl = (preferReal && (t.lastRealUrl?.isNotEmpty == true))
-        ? t.lastRealUrl!
-        : t.url;
-
-    await _repo.addLog(t.id, 'info', 'probe start url=$probeUrl');
+    await _repo.addLog(t.id, 'info', 'probe start');
     final prober = Prober(_dio);
 
-    Future<bool> probeOnce(String urlToProbe) async {
+    Future<bool> probeOnce() async {
       try {
         final p = await prober.probe(
-          urlToProbe,
+          t.url,
           referer: t.referer,
           userAgent: t.userAgent,
         );
@@ -106,8 +97,7 @@ class DownloaderService {
             : t.fileName;
         final dir = File(t.savePath).parent.path;
 
-        // Ne pas écraser t.url. On met à jour lastRealUrl.
-        t.lastRealUrl = p.finalUrl.toString();
+        t.url = p.finalUrl.toString();
         t.fileName = newName;
         t.savePath = '$dir/$newName';
         t.tempPath = '$dir/$newName.part';
@@ -118,7 +108,7 @@ class DownloaderService {
         await _repo.addLog(
           t.id,
           'info',
-          'probe ok total=${t.total} acceptRanges=${t.acceptRanges} real=${t.lastRealUrl}',
+          'probe ok total=${t.total} acceptRanges=${t.acceptRanges}',
         );
         return true;
       } catch (e) {
@@ -137,13 +127,14 @@ class DownloaderService {
       }
     }
 
-    var ok = await probeOnce(probeUrl);
+    var ok = await probeOnce();
 
-    // Fallback http -> https
-    if (!ok && probeUrl.startsWith('http://')) {
-      final https = probeUrl.replaceFirst('http://', 'https://');
+    if (!ok && t.url.startsWith('http://')) {
+      final https = t.url.replaceFirst('http://', 'https://');
       await _repo.addLog(t.id, 'warn', 'retry probe with https: $https');
-      ok = await probeOnce(https);
+      t.url = https;
+      await _repo.upsertTask(t);
+      ok = await probeOnce();
     }
 
     if (!ok) {
@@ -157,19 +148,7 @@ class DownloaderService {
     await _startInternal(t, segs, psize);
   }
 
-  // Retry standard: conserve lastRealUrl
   Future<void> retry(int taskId) async {
-    await _resetForRetry(taskId, keepReal: true);
-    await start(taskId, preferReal: true);
-  }
-
-  // Full retry: ignore lastRealUrl et repart de url d’origine
-  Future<void> fullRetry(int taskId) async {
-    await _resetForRetry(taskId, keepReal: false);
-    await start(taskId, preferReal: false);
-  }
-
-  Future<void> _resetForRetry(int taskId, {required bool keepReal}) async {
     await pause(taskId);
     final t = await _repo.getTask(taskId);
     if (t == null) return;
@@ -183,14 +162,10 @@ class DownloaderService {
     t.downloaded = 0;
     t.speedBps = 0;
     t.etaSeconds = 0;
-    if (!keepReal) t.lastRealUrl = null;
     t.state = 'queued';
     await _repo.upsertTask(t);
-    await _repo.addLog(
-      taskId,
-      'info',
-      keepReal ? 'retry (realUrl)' : 'full retry (origin url)',
-    );
+    await _repo.addLog(taskId, 'info', 'retry');
+    await start(taskId);
   }
 
   Future<void> pause(int taskId) async {
@@ -225,9 +200,7 @@ class DownloaderService {
     int segments,
     int partSize,
   ) async {
-    final effective = Uri.parse(
-      task.lastRealUrl?.isNotEmpty == true ? task.lastRealUrl! : task.url,
-    );
+    final url = Uri.parse(task.url);
     final total = task.total;
 
     if (total <= 0 || task.acceptRanges == false) {
@@ -249,7 +222,6 @@ class DownloaderService {
     final parts = await _ensureParts(task, segments, partSize);
     task.state = 'running';
     await _repo.upsertTask(task);
-    await _repo.addLog(task.id, 'info', 'GET start $effective');
     await _repo.addLog(
       task.id,
       'info',
@@ -271,7 +243,7 @@ class DownloaderService {
       final start = p.start + p.downloaded;
       final end = p.end;
       final spec = SegmentSpec(
-        effective,
+        url,
         task.tempPath,
         start,
         end,
@@ -312,7 +284,7 @@ class DownloaderService {
 
       await File(task.tempPath).rename(task.savePath);
       await _maybeUnquarantine(task);
-      await _setWhereFromsForTask(task); // provenance Finder
+      await _setWhereFromsForTask(task);
 
       task.state = 'completed';
       task.speedBps = 0;
@@ -332,86 +304,193 @@ class DownloaderService {
     }
   }
 
+  // Reprise robuste: Range + backoff + pas de troncature.
   Future<void> _single(DownloadTask task) async {
-    final effective = Uri.parse(
-      task.lastRealUrl?.isNotEmpty == true ? task.lastRealUrl! : task.url,
-    );
-    await _repo.addLog(task.id, 'info', 'GET start $effective');
-
-    final options = Options(
-      responseType: ResponseType.stream,
-      followRedirects: true,
-      maxRedirects: 10,
-      headers: {
-        'accept-encoding': 'identity',
-        if (task.referer != null) 'referer': task.referer!,
-        if (task.userAgent != null) 'user-agent': task.userAgent!,
-      },
-    );
-
-    final token = CancelToken();
-    _tokens[task.id] = [token];
     task.state = 'running';
     await _repo.upsertTask(task);
     await _repo.addLog(task.id, 'info', 'start single');
 
-    final resp = await _dio.getUri(
-      effective,
-      options: options,
-      cancelToken: token,
-    );
-    task.lastRealUrl = resp.realUri.toString();
-    await _repo.upsertTask(task);
-    await _repo.addLog(
-      task.id,
-      'info',
-      'realUri=${task.lastRealUrl} status=${resp.statusCode}',
-    );
+    final tmpFile = File(task.tempPath);
+    int downloaded = 0;
+    if (await tmpFile.exists()) {
+      downloaded = await tmpFile.length();
+    } else {
+      await tmpFile.create(recursive: true);
+    }
 
-    final cl = int.tryParse(resp.headers.value('content-length') ?? '');
-    if ((cl ?? 0) > 0 && task.total == 0) {
-      task.total = cl!;
+    // Aligne l’état avec le disque
+    if (downloaded != task.downloaded) {
+      task.downloaded = downloaded;
       await _repo.upsertTask(task);
     }
 
-    final Stream<List<int>> stream = resp.data.stream;
+    final raf = await tmpFile.open(mode: FileMode.write);
+    await raf.setPosition(downloaded);
 
-    RandomAccessFile raf;
+    int attempt = 0;
+    const maxAttempts = 8;
+
     try {
-      raf = await File(task.tempPath).open(mode: FileMode.write);
-    } on FileSystemException catch (e) {
-      if (_isOpNotPermitted(e)) {
-        await _applyFallbackPaths(task);
-        raf = await File(task.tempPath).open(mode: FileMode.write);
-      } else {
-        rethrow;
+      while (true) {
+        // Pause/stop: un nouveau token par tentative
+        final token = CancelToken();
+        _tokens[task.id] = [token];
+
+        // En-têtes
+        final headers = <String, String>{
+          'accept-encoding': 'identity',
+          'connection': 'keep-alive',
+          if (task.referer != null) 'referer': task.referer!,
+          if (task.userAgent != null) 'user-agent': task.userAgent!,
+        };
+
+        // Reprise si possible
+        if (downloaded > 0) {
+          headers['range'] = 'bytes=$downloaded-';
+        }
+
+        Response<ResponseBody> resp;
+        try {
+          resp = await _dio.get<ResponseBody>(
+            task.url,
+            options: Options(
+              responseType: ResponseType.stream,
+              followRedirects: true,
+              maxRedirects: 10,
+              headers: headers,
+              validateStatus: (s) => s != null && s < 500,
+            ),
+            cancelToken: token,
+          );
+        } on DioException catch (e) {
+          if (CancelToken.isCancel(e)) {
+            await _repo.addLog(task.id, 'info', 'cancelled');
+            return;
+          }
+          attempt++;
+          final delay = Duration(seconds: min(8, 1 << attempt));
+          await _repo.addLog(
+            task.id,
+            'warn',
+            'request fail $e → retry in ${delay.inSeconds}s',
+          );
+          await Future.delayed(delay);
+          if (attempt >= maxAttempts) {
+            task.state = 'error';
+            await _repo.upsertTask(task);
+            await _repo.addLog(task.id, 'error', 'max retries reached');
+            return;
+          }
+          continue;
+        }
+
+        final status = resp.statusCode ?? 0;
+        await _repo.addLog(
+          task.id,
+          'info',
+          'GET ${resp.realUri} status=$status',
+        );
+
+        // Déduire la taille totale
+        final contentRange = resp.headers.value(
+          'content-range',
+        ); // ex: bytes 200-999/1000
+        if (contentRange != null) {
+          final m = RegExp(r'/(\d+)$').firstMatch(contentRange);
+          final tot = m != null ? int.tryParse(m.group(1)!) : null;
+          if (tot != null && task.total == 0) {
+            task.total = tot;
+            await _repo.upsertTask(task);
+          }
+        } else if (status == 200) {
+          final cl = int.tryParse(resp.headers.value('content-length') ?? '');
+          if (downloaded == 0 && cl != null && task.total == 0) {
+            task.total = cl;
+            await _repo.upsertTask(task);
+          }
+          // Si on a demandé une reprise mais le serveur ignore Range → repartir de 0
+          if (downloaded > 0) {
+            await _repo.addLog(
+              task.id,
+              'warn',
+              'server ignored Range, restarting from 0',
+            );
+            downloaded = 0;
+            task.downloaded = 0;
+            await raf.truncate(0);
+            await raf.setPosition(0);
+            await _repo.upsertTask(task);
+          }
+        }
+
+        // Lecture flux
+        int readThisAttempt = 0;
+        final stream = resp.data!.stream;
+        final t0 = DateTime.now();
+        final baseBytes = downloaded;
+
+        try {
+          await for (final chunk in stream) {
+            await raf.writeFrom(chunk);
+            downloaded += chunk.length;
+            readThisAttempt += chunk.length;
+
+            task.downloaded = downloaded;
+            _updateSpeed(task, baseTime: t0, baseBytes: baseBytes);
+            await _repo.upsertTask(task);
+          }
+        } on Object catch (e) {
+          if (e is DioException && CancelToken.isCancel(e)) {
+            await _repo.addLog(task.id, 'info', 'cancelled');
+            return;
+          }
+          // Erreur de corps: on retente depuis "downloaded"
+          attempt++;
+          final delay = Duration(seconds: min(8, 1 << attempt));
+          await _repo.addLog(
+            task.id,
+            'warn',
+            'stream error $e after $readThisAttempt bytes → retry in ${delay.inSeconds}s',
+          );
+          await Future.delayed(delay);
+          if (attempt >= maxAttempts) {
+            task.state = 'error';
+            await _repo.upsertTask(task);
+            await _repo.addLog(task.id, 'error', 'max retries reached');
+            return;
+          }
+          // boucle → nouvelle requête Range=downloaded-
+          continue;
+        }
+
+        // Fin d’une tentative sans exception
+        attempt = 0; // on reset le compteur car progrès OK
+
+        // Terminé ?
+        if (task.total > 0 && downloaded >= task.total) {
+          break;
+        }
+
+        // Si pas de total connu, on tente de repartir jusqu’à ce que le serveur ferme au vrai EOF.
+        // Si la tentative n’a rien lu, arrête pour éviter boucle infinie.
+        if (readThisAttempt == 0) {
+          await _repo.addLog(
+            task.id,
+            'error',
+            'connection closed with no progress',
+          );
+          task.state = 'error';
+          await _repo.upsertTask(task);
+          return;
+        }
+
+        // Sinon, on boucle pour reprendre Range=downloaded-
       }
+    } finally {
+      await raf.close();
     }
 
-    final t0 = DateTime.now();
-    int done = 0;
-
-    await for (final List<int> chunk in stream) {
-      await raf.writeFrom(chunk);
-      done += chunk.length;
-      task.downloaded = done;
-      _updateSpeed(task, baseTime: t0, baseBytes: 0);
-      await _repo.upsertTask(task);
-    }
-
-    await raf.close();
-
-    if (task.total > 0 && task.downloaded != task.total) {
-      task.state = 'error';
-      await _repo.upsertTask(task);
-      await _repo.addLog(
-        task.id,
-        'error',
-        'size mismatch: got=${task.downloaded} expected=${task.total}',
-      );
-      return;
-    }
-
+    // Fichier final
     await File(task.tempPath).rename(task.savePath);
     await _maybeUnquarantine(task);
     await _setWhereFromsForTask(task);
@@ -457,13 +536,20 @@ class DownloaderService {
   }
 
   Future<void> _preallocate(String path, int len) async {
-    final f = await File(path).create(recursive: true);
-    final raf = await f.open(mode: FileMode.write);
-    if (len > 0) {
-      await raf.setPosition(len - 1);
-      await raf.writeFrom(const [0]);
+    try {
+      final f = await File(path).create(recursive: true);
+      final raf = await f.open(mode: FileMode.write);
+      if (len > 0) {
+        await raf.setPosition(len - 1);
+        await raf.writeFrom(const [0]);
+      }
+      await raf.close();
+    } on FileSystemException catch (e) {
+      if (_isOpNotPermitted(e)) {
+        rethrow;
+      }
+      rethrow;
     }
-    await raf.close();
   }
 
   void _updateSpeed(DownloadTask t, {DateTime? baseTime, int? baseBytes}) {
@@ -533,7 +619,6 @@ class DownloaderService {
   Future<void> _setWhereFromsForTask(DownloadTask t) async {
     if (!Platform.isMacOS) return;
     final urls = <String>[
-      if (t.lastRealUrl?.isNotEmpty == true) t.lastRealUrl!,
       t.url,
       if (t.referer != null) t.referer!,
     ].where((s) => s.isNotEmpty).toList();
@@ -660,7 +745,6 @@ class DownloaderService {
     return 'download.bin';
   }
 
-  // utilitaires publics
   Future<void> verify(int taskId) async {
     final t = await _repo.getTask(taskId);
     if (t == null) return;
@@ -714,5 +798,9 @@ class DownloaderService {
       final dir = File(p).parent.path;
       await _openPath(dir);
     }
+  }
+
+  Future<void> fullRetry(int id) async {
+    return retry(id);
   }
 }
