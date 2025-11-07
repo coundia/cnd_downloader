@@ -86,4 +86,15 @@ class DownloadRepository {
         .sortByTs()
         .watch(fireImmediately: true);
   }
+
+  Future<void> clearLogs(int taskId) async {
+    final ids = await _isar.downloadLogs
+        .filter()
+        .taskIdEqualTo(taskId)
+        .idProperty()
+        .findAll();
+    await _isar.writeTxn(() async {
+      await _isar.downloadLogs.deleteAll(ids);
+    });
+  }
 }
