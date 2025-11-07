@@ -1,6 +1,7 @@
 // lib/services/downloader_service.dart
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
@@ -116,7 +117,7 @@ class DownloaderService {
           await _repo.addLog(
             t.id,
             'error',
-            'EPERM: réseau bloqué par le sandbox macOS. Active Outgoing Connections (Client) dans App Sandbox et rebuild.',
+            'EPERM: réseau bloqué par le sandbox macOS. Active Outgoing Connections (Client) et rebuild.',
           );
         } else {
           await _repo.addLog(t.id, 'error', 'probe fail $e');
@@ -281,6 +282,9 @@ class DownloaderService {
       }
 
       await File(task.tempPath).rename(task.savePath);
+      await _maybeUnquarantine(task);
+      await _setWhereFromsForTask(task); // ← Provenance
+
       task.state = 'completed';
       task.speedBps = 0;
       task.etaSeconds = 0;
@@ -363,6 +367,9 @@ class DownloaderService {
     }
 
     await File(task.tempPath).rename(task.savePath);
+    await _maybeUnquarantine(task);
+    await _setWhereFromsForTask(task); // ← Provenance
+
     task.state = 'completed';
     task.speedBps = 0;
     task.etaSeconds = 0;
@@ -449,7 +456,7 @@ class DownloaderService {
     if (e is FileSystemException) {
       final code = e.osError?.errorCode;
       final msg = (e.osError?.message ?? e.message).toLowerCase();
-      if (code == 1) return true;
+      if (code == 1) return true; // EPERM
       if (msg.contains('operation not permitted') || msg.contains('eperm')) {
         return true;
       }
@@ -461,6 +468,126 @@ class DownloaderService {
       }
     }
     return false;
+  }
+
+  Future<void> _maybeUnquarantine(DownloadTask t) async {
+    if (!Platform.isMacOS) return;
+    try {
+      final probe = await Process.run('/usr/bin/xattr', [
+        '-p',
+        'com.apple.quarantine',
+        t.savePath,
+      ]);
+      if (probe.exitCode == 0) {
+        await Process.run('/usr/bin/xattr', [
+          '-d',
+          'com.apple.quarantine',
+          t.savePath,
+        ]);
+        await _repo.addLog(t.id, 'info', 'removed quarantine on ${t.fileName}');
+      }
+    } catch (e) {
+      await _repo.addLog(t.id, 'warn', 'unquarantine failed: $e');
+    }
+  }
+
+  Future<void> _setWhereFromsForTask(DownloadTask t) async {
+    if (!Platform.isMacOS) return;
+    final urls = <String>[
+      t.url,
+      if (t.referer != null) t.referer!,
+    ].where((s) => s.isNotEmpty).toList();
+    if (urls.isEmpty) return;
+
+    try {
+      final tmp = await getTemporaryDirectory();
+      final xmlFile = File(
+        '${tmp.path}/wherefroms_${DateTime.now().microsecondsSinceEpoch}.plist',
+      );
+      final binFile = File('${xmlFile.path}.bin');
+
+      final xml = _plistForUrls(urls);
+      await xmlFile.writeAsString(xml, flush: true);
+
+      final conv = await Process.run('/usr/bin/plutil', [
+        '-convert',
+        'binary1',
+        '-o',
+        binFile.path,
+        xmlFile.path,
+      ]);
+      if (conv.exitCode != 0) {
+        await _repo.addLog(t.id, 'warn', 'plutil failed: ${conv.stderr}');
+        await _safeDelete(xmlFile);
+        await _safeDelete(binFile);
+        return;
+      }
+
+      final bytes = await binFile.readAsBytes();
+      final hex = _hexFromBytes(bytes);
+
+      final xr = await Process.run('/usr/bin/xattr', [
+        '-w',
+        '-x',
+        'com.apple.metadata:kMDItemWhereFroms',
+        hex,
+        t.savePath,
+      ]);
+      if (xr.exitCode == 0) {
+        await _repo.addLog(t.id, 'info', 'set wherefroms: ${urls.join(' | ')}');
+        await Process.run('/usr/bin/mdimport', ['-f', t.savePath]);
+      } else {
+        await _repo.addLog(
+          t.id,
+          'warn',
+          'xattr wherefroms failed: ${xr.stderr}',
+        );
+      }
+
+      await _safeDelete(xmlFile);
+      await _safeDelete(binFile);
+    } catch (e) {
+      await _repo.addLog(t.id, 'warn', 'wherefroms error: $e');
+    }
+  }
+
+  Future<void> _safeDelete(File f) async {
+    try {
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
+  }
+
+  String _plistForUrls(List<String> urls) {
+    final esc = urls.map(_xmlEscape).toList();
+    final items = esc.map((u) => '<string>$u</string>').join();
+    return '''
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <array>
+    $items
+  </array>
+</plist>
+''';
+  }
+
+  String _xmlEscape(String s) {
+    return s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
+  }
+
+  String _hexFromBytes(Uint8List b) {
+    final sb = StringBuffer();
+    const hex = '0123456789abcdef';
+    for (final v in b) {
+      sb.write(hex[(v >> 4) & 0xF]);
+      sb.write(hex[v & 0xF]);
+    }
+    return sb.toString();
   }
 
   Future<String> _fallbackPath(String fileName) async {
@@ -493,6 +620,7 @@ class DownloaderService {
     return 'download.bin';
   }
 
+  // Utilitaires publics
   Future<void> verify(int taskId) async {
     final t = await _repo.getTask(taskId);
     if (t == null) return;
@@ -517,9 +645,21 @@ class DownloaderService {
     await _revealPath(t.savePath);
   }
 
+  Future<void> openWithApp(int taskId, String appName) async {
+    final t = await _repo.getTask(taskId);
+    if (t == null) return;
+    if (Platform.isMacOS) {
+      await Process.run('/usr/bin/open', ['-a', appName, t.savePath]);
+    } else if (Platform.isWindows) {
+      await Process.run('cmd', ['/c', 'start', '', t.savePath]);
+    } else if (Platform.isLinux) {
+      await Process.run('xdg-open', [t.savePath]);
+    }
+  }
+
   Future<void> _openPath(String p) async {
     if (Platform.isMacOS) {
-      await Process.run('open', [p]);
+      await Process.run('/usr/bin/open', [p]);
     } else if (Platform.isWindows) {
       await Process.run('cmd', ['/c', 'start', '', p]);
     } else if (Platform.isLinux) {
@@ -529,7 +669,7 @@ class DownloaderService {
 
   Future<void> _revealPath(String p) async {
     if (Platform.isMacOS) {
-      await Process.run('open', ['-R', p]);
+      await Process.run('/usr/bin/open', ['-R', p]);
     } else {
       final dir = File(p).parent.path;
       await _openPath(dir);
