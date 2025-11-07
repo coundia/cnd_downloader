@@ -37,6 +37,10 @@ class DownloadListVm extends StateNotifier<AsyncValue<void>> {
   Future<void> pause(int id) => service.pause(id);
   Future<void> delete(int id) => service.cancel(id);
   Future<void> retry(int id) => service.retry(id);
+
+  Future<void> verify(int id) => service.verify(id);
+  Future<void> open(int id) => service.openFile(id);
+  Future<void> reveal(int id) => service.revealFile(id);
 }
 
 final listVmProvider = StateNotifierProvider<DownloadListVm, AsyncValue<void>>(

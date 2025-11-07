@@ -179,6 +179,20 @@ class _DownloadTile extends ConsumerWidget {
             onPressed: () => vm.delete(task.id),
             icon: const Icon(Icons.delete_forever),
           ),
+
+          if (task.state == 'completed')
+            IconButton(
+              onPressed: () => vm.open(task.id),
+              icon: const Icon(Icons.open_in_new),
+            ),
+          IconButton(
+            onPressed: () => vm.reveal(task.id),
+            icon: const Icon(Icons.folder_open),
+          ),
+          IconButton(
+            onPressed: () => vm.verify(task.id),
+            icon: const Icon(Icons.check_circle),
+          ),
         ],
       ),
     );

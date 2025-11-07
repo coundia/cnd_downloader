@@ -30,7 +30,10 @@ class DownloaderService {
       BaseOptions(
         connectTimeout: Duration(milliseconds: settings.connectTimeoutMs),
         receiveTimeout: Duration(milliseconds: settings.receiveTimeoutMs),
-        headers: {'user-agent': settings.defaultUserAgent},
+        headers: {
+          'user-agent': settings.defaultUserAgent,
+          'accept-encoding': 'identity',
+        },
         followRedirects: true,
         maxRedirects: 10,
         validateStatus: (s) => s != null && s < 500,
@@ -74,9 +77,9 @@ class DownloaderService {
     if (t.state == 'completed') return;
 
     await _repo.addLog(t.id, 'info', 'probe start');
-
     final prober = Prober(_dio);
-    Future<bool> doProbe() async {
+
+    Future<bool> probeOnce() async {
       try {
         final p = await prober.probe(
           t.url,
@@ -107,15 +110,13 @@ class DownloaderService {
         );
         return true;
       } catch (e) {
-        // EPERM explicite
         if (e is DioException &&
             e.error is SocketException &&
-            _isOpNotPermitted(e.toString())) {
+            _isOpNotPermitted(e.error.toString())) {
           await _repo.addLog(
             t.id,
             'error',
-            'macOS sandbox blocked network (EPERM). Enable App Sandbox → Outgoing Connections (Client) '
-                'or update entitlements. See DebugProfile.entitlements.',
+            'EPERM: réseau bloqué par le sandbox macOS. Active Outgoing Connections (Client) dans App Sandbox et rebuild.',
           );
         } else {
           await _repo.addLog(t.id, 'error', 'probe fail $e');
@@ -124,16 +125,14 @@ class DownloaderService {
       }
     }
 
-    // Premier essai
-    var ok = await doProbe();
+    var ok = await probeOnce();
 
-    // Fallback unique http->https si échec et URL en http
     if (!ok && t.url.startsWith('http://')) {
       final https = t.url.replaceFirst('http://', 'https://');
       await _repo.addLog(t.id, 'warn', 'retry probe with https: $https');
       t.url = https;
       await _repo.upsertTask(t);
-      ok = await doProbe();
+      ok = await probeOnce();
     }
 
     if (!ok) {
@@ -269,6 +268,18 @@ class DownloaderService {
 
     try {
       await Future.wait(futures);
+
+      if (task.total > 0 && task.downloaded != task.total) {
+        task.state = 'error';
+        await _repo.upsertTask(task);
+        await _repo.addLog(
+          task.id,
+          'error',
+          'size mismatch: got=${task.downloaded} expected=${task.total}',
+        );
+        return;
+      }
+
       await File(task.tempPath).rename(task.savePath);
       task.state = 'completed';
       task.speedBps = 0;
@@ -294,6 +305,7 @@ class DownloaderService {
       followRedirects: true,
       maxRedirects: 10,
       headers: {
+        'accept-encoding': 'identity',
         if (task.referer != null) 'referer': task.referer!,
         if (task.userAgent != null) 'user-agent': task.userAgent!,
       },
@@ -306,6 +318,12 @@ class DownloaderService {
     await _repo.addLog(task.id, 'info', 'start single');
 
     final resp = await _dio.get(task.url, options: options, cancelToken: token);
+    final cl = int.tryParse(resp.headers.value('content-length') ?? '');
+    if ((cl ?? 0) > 0 && task.total == 0) {
+      task.total = cl!;
+      await _repo.upsertTask(task);
+    }
+
     final Stream<List<int>> stream = resp.data.stream;
 
     RandomAccessFile raf;
@@ -332,6 +350,18 @@ class DownloaderService {
     }
 
     await raf.close();
+
+    if (task.total > 0 && task.downloaded != task.total) {
+      task.state = 'error';
+      await _repo.upsertTask(task);
+      await _repo.addLog(
+        task.id,
+        'error',
+        'size mismatch: got=${task.downloaded} expected=${task.total}',
+      );
+      return;
+    }
+
     await File(task.tempPath).rename(task.savePath);
     task.state = 'completed';
     task.speedBps = 0;
@@ -419,8 +449,14 @@ class DownloaderService {
     if (e is FileSystemException) {
       final code = e.osError?.errorCode;
       final msg = (e.osError?.message ?? e.message).toLowerCase();
-      if (code == 1) return true; // EPERM
+      if (code == 1) return true;
       if (msg.contains('operation not permitted') || msg.contains('eperm')) {
+        return true;
+      }
+    }
+    if (e is SocketException) {
+      final m = (e.message).toLowerCase();
+      if (m.contains('operation not permitted') || m.contains('eperm')) {
         return true;
       }
     }
@@ -455,5 +491,48 @@ class DownloaderService {
       if (last.isNotEmpty) return last;
     }
     return 'download.bin';
+  }
+
+  Future<void> verify(int taskId) async {
+    final t = await _repo.getTask(taskId);
+    if (t == null) return;
+    final f = File(t.savePath);
+    if (!await f.exists()) {
+      await _repo.addLog(taskId, 'error', 'file not found ${t.savePath}');
+      return;
+    }
+    final len = await f.length();
+    await _repo.addLog(taskId, 'info', 'verify size=$len expected=${t.total}');
+  }
+
+  Future<void> openFile(int taskId) async {
+    final t = await _repo.getTask(taskId);
+    if (t == null) return;
+    await _openPath(t.savePath);
+  }
+
+  Future<void> revealFile(int taskId) async {
+    final t = await _repo.getTask(taskId);
+    if (t == null) return;
+    await _revealPath(t.savePath);
+  }
+
+  Future<void> _openPath(String p) async {
+    if (Platform.isMacOS) {
+      await Process.run('open', [p]);
+    } else if (Platform.isWindows) {
+      await Process.run('cmd', ['/c', 'start', '', p]);
+    } else if (Platform.isLinux) {
+      await Process.run('xdg-open', [p]);
+    }
+  }
+
+  Future<void> _revealPath(String p) async {
+    if (Platform.isMacOS) {
+      await Process.run('open', ['-R', p]);
+    } else {
+      final dir = File(p).parent.path;
+      await _openPath(dir);
+    }
   }
 }
