@@ -1,17 +1,12 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'settings.dart';
 
 Future<String> defaultDownloadDir() async {
-  try {
-    final d = await getDownloadsDirectory();
-    if (d != null) return d.path;
-  } catch (_) {}
-  final home =
-      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
-  if (home != null) {
-    final dl = Directory('$home/Downloads');
-    if (await dl.exists()) return dl.path;
-  }
-  final docs = await getApplicationDocumentsDirectory();
-  return docs.path;
+  final pref = settings.downloadDir;
+  if (pref != null && pref.isNotEmpty) return pref;
+  final d = await getDownloadsDirectory();
+  if (d != null) return d.path;
+  final doc = await getApplicationDocumentsDirectory();
+  return '${doc.path}/Downloads';
 }
