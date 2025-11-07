@@ -42,33 +42,85 @@ class DownloaderService {
     String? referer,
     String? userAgent,
   }) async {
-    final prober = Prober(_dio);
-    final p = await prober.probe(
-      url,
-      referer: referer ?? settings.defaultReferer,
-      userAgent: userAgent ?? settings.defaultUserAgent,
-    );
-    final name = prober.resolveFileName(p.contentDisposition, p.finalUrl);
+    try {
+      final d = Directory(dir);
+      if (!await d.exists()) {
+        await d.create(recursive: true);
+      }
+    } catch (_) {}
+    final name = _fileNameFromUrl(url);
     final t = DownloadTask()
-      ..url = p.finalUrl.toString()
+      ..url = url
       ..referer = referer ?? settings.defaultReferer
       ..userAgent = userAgent ?? settings.defaultUserAgent
       ..fileName = name
       ..savePath = '$dir/$name'
       ..tempPath = '$dir/$name.part'
-      ..total = p.total ?? 0
-      ..acceptRanges = p.acceptRanges
+      ..total = 0
+      ..acceptRanges = false
       ..state = 'queued';
-    return await _repo.upsertTask(t);
+    final id = await _repo.upsertTask(t);
+    await _repo.addLog(id, 'info', 'queued $url');
+    return id;
   }
 
   Future<void> start(int taskId, {int? segments, int? partSize}) async {
     final t = await _repo.getTask(taskId);
     if (t == null) return;
     if (t.state == 'completed') return;
+    await _repo.addLog(t.id, 'info', 'probe start');
+    final prober = Prober(_dio);
+    try {
+      final p = await prober.probe(
+        t.url,
+        referer: t.referer,
+        userAgent: t.userAgent,
+      );
+      final nameFromHeaders = prober.resolveFileName(
+        p.contentDisposition,
+        p.finalUrl,
+      );
+      final newName = nameFromHeaders.isNotEmpty ? nameFromHeaders : t.fileName;
+      final dir = File(t.savePath).parent.path;
+      t.url = p.finalUrl.toString();
+      t.fileName = newName;
+      t.savePath = '$dir/$newName';
+      t.tempPath = '$dir/$newName.part';
+      t.total = p.total ?? 0;
+      t.acceptRanges = p.acceptRanges;
+      await _repo.upsertTask(t);
+      await _repo.addLog(
+        t.id,
+        'info',
+        'probe ok total=${t.total} acceptRanges=${t.acceptRanges}',
+      );
+    } catch (e) {
+      t.state = 'error';
+      await _repo.upsertTask(t);
+      await _repo.addLog(t.id, 'error', 'probe fail $e');
+      return;
+    }
     final segs = segments ?? settings.segmentsPerFile;
     final psize = partSize ?? settings.partSizeBytes;
     await _startInternal(t, segs, psize);
+  }
+
+  Future<void> retry(int taskId) async {
+    await pause(taskId);
+    final t = await _repo.getTask(taskId);
+    if (t == null) return;
+    try {
+      final f = File(t.tempPath);
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
+    await _repo.clearParts(taskId);
+    t.downloaded = 0;
+    t.speedBps = 0;
+    t.etaSeconds = 0;
+    t.state = 'queued';
+    await _repo.upsertTask(t);
+    await _repo.addLog(taskId, 'info', 'retry');
+    await start(taskId);
   }
 
   Future<void> pause(int taskId) async {
@@ -81,6 +133,7 @@ class DownloaderService {
     if (t == null) return;
     t.state = 'paused';
     await _repo.upsertTask(t);
+    await _repo.addLog(taskId, 'info', 'paused');
   }
 
   Future<void> cancel(int taskId) async {
@@ -89,9 +142,7 @@ class DownloaderService {
     if (t == null) return;
     try {
       final f = File(t.tempPath);
-      if (await f.exists()) {
-        await f.delete();
-      }
+      if (await f.exists()) await f.delete();
     } catch (_) {}
     await _repo.deleteTaskCascade(taskId);
   }
@@ -111,6 +162,11 @@ class DownloaderService {
     final parts = await _ensureParts(task, segments, partSize);
     task.state = 'running';
     await _repo.upsertTask(task);
+    await _repo.addLog(
+      task.id,
+      'info',
+      'start segmented count=${parts.length}',
+    );
     _tokens[task.id] = List.generate(parts.length, (_) => CancelToken());
     _lastBytes[task.id] = task.downloaded;
     _lastTime[task.id] = DateTime.now();
@@ -154,14 +210,17 @@ class DownloaderService {
       task.speedBps = 0;
       task.etaSeconds = 0;
       await _repo.upsertTask(task);
+      await _repo.addLog(task.id, 'info', 'completed');
       _tokens.remove(task.id);
     } on DioException catch (e) {
       if (CancelToken.isCancel(e)) return;
       task.state = 'error';
       await _repo.upsertTask(task);
-    } catch (_) {
+      await _repo.addLog(task.id, 'error', 'dio $e');
+    } catch (e) {
       task.state = 'error';
       await _repo.upsertTask(task);
+      await _repo.addLog(task.id, 'error', 'error $e');
     }
   }
 
@@ -179,6 +238,7 @@ class DownloaderService {
     _tokens[task.id] = [token];
     task.state = 'running';
     await _repo.upsertTask(task);
+    await _repo.addLog(task.id, 'info', 'start single');
     final resp = await _dio.get(task.url, options: options, cancelToken: token);
     final Stream<List<int>> stream = resp.data.stream;
     final raf = await File(task.tempPath).open(mode: FileMode.write);
@@ -197,6 +257,7 @@ class DownloaderService {
     task.speedBps = 0;
     task.etaSeconds = 0;
     await _repo.upsertTask(task);
+    await _repo.addLog(task.id, 'info', 'completed');
     _tokens.remove(task.id);
   }
 
@@ -260,5 +321,12 @@ class DownloaderService {
     _lastBytes[t.id] = t.downloaded;
   }
 
-  Future<void> retry(int id) async {}
+  String _fileNameFromUrl(String url) {
+    final u = Uri.parse(url);
+    if (u.pathSegments.isNotEmpty) {
+      final last = u.pathSegments.last;
+      if (last.isNotEmpty) return last;
+    }
+    return 'download.bin';
+  }
 }

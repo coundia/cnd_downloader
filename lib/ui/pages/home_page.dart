@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/paths.dart';
 import '../../data/download_models.dart';
 import '../../viewmodels/download_list_vm.dart';
 import 'settings_page.dart';
@@ -11,10 +12,7 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tasksAsync = ref.watch(downloadListProvider);
-    final tasks = tasksAsync.value ?? <DownloadTask>[];
     final vm = ref.watch(listVmProvider.notifier);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('FastDown'),
@@ -28,29 +26,31 @@ class HomePage extends ConsumerWidget {
           ),
         ],
       ),
-      body: tasksAsync.when(
-        data: (_) => tasks.isEmpty
-            ? const Center(child: Text('No downloads'))
-            : ListView.separated(
-                itemCount: tasks.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (c, i) => _DownloadTile(task: tasks[i], vm: vm),
-              ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('Error')),
-      ),
+      body: ref
+          .watch(downloadListProvider)
+          .when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, __) => const Center(child: Text('Error')),
+            data: (tasks) => tasks.isEmpty
+                ? const Center(child: Text('No downloads'))
+                : ListView.separated(
+                    itemCount: tasks.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (c, i) => _DownloadTile(task: tasks[i]),
+                  ),
+          ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final urls = await _askUrls(context);
           if (urls == null || urls.isEmpty) return;
-          final dir = await FilePicker.platform.getDirectoryPath();
-          if (dir == null) return;
+          String? dir = await FilePicker.platform.getDirectoryPath();
+          dir ??= await defaultDownloadDir();
           for (final u in urls) {
             await vm.addOnly(u, dir);
           }
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Queued ${urls.length} link(s)')),
+              SnackBar(content: Text('Queued ${urls.length} link(s) → $dir')),
             );
           }
         },
@@ -103,11 +103,11 @@ class HomePage extends ConsumerWidget {
 
 class _DownloadTile extends ConsumerWidget {
   final DownloadTask task;
-  final DownloadListVm vm;
-  const _DownloadTile({required this.task, required this.vm});
+  const _DownloadTile({required this.task});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final vm = ref.read(listVmProvider.notifier);
     final p = task.total > 0 ? task.downloaded / task.total : 0.0;
     final sizeStr = '${_fmtBytes(task.downloaded)} / ${_fmtBytes(task.total)}';
     final speed = task.speedBps > 0 ? '${_fmtBytes(task.speedBps)}/s' : '';
@@ -153,7 +153,7 @@ class _DownloadTile extends ConsumerWidget {
             ),
           if (task.state == 'error')
             IconButton(
-              onPressed: () => vm.start(task.id),
+              onPressed: () => vm.retry(task.id),
               icon: const Icon(Icons.refresh),
             ),
           IconButton(
@@ -183,9 +183,7 @@ class _DownloadTile extends ConsumerWidget {
 
   String _fmtEta(int s) {
     if (s <= 0) return '';
-    final h = s ~/ 3600;
-    final m = (s % 3600) ~/ 60;
-    final sec = s % 60;
+    final h = s ~/ 3600, m = (s % 3600) ~/ 60, sec = s % 60;
     if (h > 0) return '${h}h${m.toString().padLeft(2, '0')}';
     if (m > 0) return '${m}m${sec.toString().padLeft(2, '0')}s';
     return '${sec}s';

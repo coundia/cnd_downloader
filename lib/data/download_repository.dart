@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:isar/isar.dart';
 import 'db.dart';
 import 'download_models.dart';
@@ -6,12 +7,17 @@ class DownloadRepository {
   final Isar _isar = AppDb.isar;
 
   Stream<List<DownloadTask>> watchAll() {
-    return _isar.downloadTasks
-        .where()
-        .watch(fireImmediately: true)
-        .map(
-          (list) => (list..sort((a, b) => b.updatedAt.compareTo(a.updatedAt))),
-        );
+    final q = _isar.downloadTasks.where();
+    final ctrl = StreamController<List<DownloadTask>>();
+    Future<void> emit() async {
+      final list = await q.findAll();
+      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      ctrl.add(list);
+    }
+
+    final sub = q.watchLazy(fireImmediately: true).listen((_) => emit());
+    ctrl.onCancel = () => sub.cancel();
+    return ctrl.stream;
   }
 
   Future<DownloadTask?> getTask(int id) => _isar.downloadTasks.get(id);
@@ -52,19 +58,19 @@ class DownloadRepository {
 
   Future<void> deleteTaskCascade(int taskId) async {
     await _isar.writeTxn(() async {
-      final ids = await _isar.downloadParts
+      final pids = await _isar.downloadParts
           .filter()
           .taskIdEqualTo(taskId)
           .idProperty()
           .findAll();
-      await _isar.downloadParts.deleteAll(ids);
+      await _isar.downloadParts.deleteAll(pids);
       await _isar.downloadTasks.delete(taskId);
-      final logIds = await _isar.downloadLogs
+      final lids = await _isar.downloadLogs
           .filter()
           .taskIdEqualTo(taskId)
           .idProperty()
           .findAll();
-      await _isar.downloadLogs.deleteAll(logIds);
+      await _isar.downloadLogs.deleteAll(lids);
     });
   }
 
