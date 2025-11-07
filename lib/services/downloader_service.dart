@@ -74,38 +74,71 @@ class DownloaderService {
     if (t.state == 'completed') return;
 
     await _repo.addLog(t.id, 'info', 'probe start');
+
     final prober = Prober(_dio);
+    Future<bool> doProbe() async {
+      try {
+        final p = await prober.probe(
+          t.url,
+          referer: t.referer,
+          userAgent: t.userAgent,
+        );
+        final nameFromHeaders = prober.resolveFileName(
+          p.contentDisposition,
+          p.finalUrl,
+        );
+        final newName = nameFromHeaders.isNotEmpty
+            ? nameFromHeaders
+            : t.fileName;
+        final dir = File(t.savePath).parent.path;
 
-    try {
-      final p = await prober.probe(
-        t.url,
-        referer: t.referer,
-        userAgent: t.userAgent,
-      );
-      final nameFromHeaders = prober.resolveFileName(
-        p.contentDisposition,
-        p.finalUrl,
-      );
-      final newName = nameFromHeaders.isNotEmpty ? nameFromHeaders : t.fileName;
-      final dir = File(t.savePath).parent.path;
+        t.url = p.finalUrl.toString();
+        t.fileName = newName;
+        t.savePath = '$dir/$newName';
+        t.tempPath = '$dir/$newName.part';
+        t.total = p.total ?? 0;
+        t.acceptRanges = p.acceptRanges;
 
-      t.url = p.finalUrl.toString();
-      t.fileName = newName;
-      t.savePath = '$dir/$newName';
-      t.tempPath = '$dir/$newName.part';
-      t.total = p.total ?? 0;
-      t.acceptRanges = p.acceptRanges;
+        await _repo.upsertTask(t);
+        await _repo.addLog(
+          t.id,
+          'info',
+          'probe ok total=${t.total} acceptRanges=${t.acceptRanges}',
+        );
+        return true;
+      } catch (e) {
+        // EPERM explicite
+        if (e is DioException &&
+            e.error is SocketException &&
+            _isOpNotPermitted(e.toString())) {
+          await _repo.addLog(
+            t.id,
+            'error',
+            'macOS sandbox blocked network (EPERM). Enable App Sandbox → Outgoing Connections (Client) '
+                'or update entitlements. See DebugProfile.entitlements.',
+          );
+        } else {
+          await _repo.addLog(t.id, 'error', 'probe fail $e');
+        }
+        return false;
+      }
+    }
 
+    // Premier essai
+    var ok = await doProbe();
+
+    // Fallback unique http->https si échec et URL en http
+    if (!ok && t.url.startsWith('http://')) {
+      final https = t.url.replaceFirst('http://', 'https://');
+      await _repo.addLog(t.id, 'warn', 'retry probe with https: $https');
+      t.url = https;
       await _repo.upsertTask(t);
-      await _repo.addLog(
-        t.id,
-        'info',
-        'probe ok total=${t.total} acceptRanges=${t.acceptRanges}',
-      );
-    } catch (e) {
+      ok = await doProbe();
+    }
+
+    if (!ok) {
       t.state = 'error';
       await _repo.upsertTask(t);
-      await _repo.addLog(t.id, 'error', 'probe fail $e');
       return;
     }
 
