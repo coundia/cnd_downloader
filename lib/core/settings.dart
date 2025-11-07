@@ -10,8 +10,8 @@ class RuntimeSettings {
   double speedSmoothing;
 
   RuntimeSettings({
-    this.segmentsPerFile = 8,
-    this.partSizeBytes = 4 * 1024 * 1024,
+    this.segmentsPerFile = 1,
+    this.partSizeBytes = 10 * 1024 * 1024,
     this.maxActiveFiles = 2,
     this.defaultUserAgent = 'FastDown/1.0',
     this.defaultReferer,
