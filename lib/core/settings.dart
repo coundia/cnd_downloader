@@ -13,7 +13,7 @@ class RuntimeSettings {
     this.segmentsPerFile = 1,
     this.partSizeBytes = 10 * 1024 * 1024,
     this.maxActiveFiles = 2,
-    this.defaultUserAgent = 'FastDown/1.0',
+    this.defaultUserAgent = 'Cnd/1.0',
     this.defaultReferer,
     this.downloadDir,
     this.connectTimeoutMs = 10000,
