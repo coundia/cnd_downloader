@@ -7,7 +7,7 @@ class FastDownApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'FastDown',
+      title: 'CND Downloader',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.teal),
       routes: {
         '/': (_) => const HomePage(),

@@ -22,18 +22,8 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('FastDown'),
+        title: const Text('CND Downloader'),
         actions: [
-          IconButton(
-            tooltip: 'Quick add',
-            onPressed: () async {
-              final dir = await defaultDownloadDir();
-              await ref
-                  .read(listVmProvider.notifier)
-                  .addOnly('https://speed.hetzner.de/10MB.bin', dir);
-            },
-            icon: const Icon(Icons.add_to_queue),
-          ),
           IconButton(
             onPressed: () => Navigator.push(
               context,
