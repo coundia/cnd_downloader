@@ -20,6 +20,7 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
   @override
   Widget build(BuildContext context) {
     final items = ref.watch(moviesProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Movies'),
@@ -52,6 +53,7 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                           .contains(q),
                     )
                     .toList();
+
           if (filtered.isEmpty) {
             return const Center(child: Text('No movie found'));
           }
@@ -59,23 +61,25 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
           return LayoutBuilder(
             builder: (c, bc) {
               final wide = bc.maxWidth >= 1100;
-              final left = wide ? bc.maxWidth - 380 : bc.maxWidth;
+              final detailsW = _clampDouble(bc.maxWidth * 0.34, 320, 480);
               final grid = _Grid(
                 items: filtered,
                 selected: selected,
                 onSelect: (it) => setState(() => selected = it),
               );
 
-              if (!wide) {
-                return grid;
-              }
+              if (!wide) return grid;
 
               final sel = selected ?? filtered.first;
               return Row(
                 children: [
-                  SizedBox(width: left, child: grid),
+                  // Grid takes the remaining width
+                  SizedBox(width: bc.maxWidth - detailsW - 1, child: grid),
                   const VerticalDivider(width: 1),
-                  SizedBox(width: 380, child: MovieDetailsPane(item: sel)),
+                  SizedBox(
+                    width: detailsW,
+                    child: MovieDetailsPane(item: sel),
+                  ),
                 ],
               );
             },
@@ -83,6 +87,12 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
         },
       ),
     );
+  }
+
+  double _clampDouble(double v, double min, double max) {
+    if (v < min) return min;
+    if (v > max) return max;
+    return v;
   }
 }
 
@@ -137,13 +147,10 @@ class _Grid extends StatelessWidget {
                   context: context,
                   showDragHandle: true,
                   isScrollControlled: true,
-                  builder: (_) => DraggableScrollableSheet(
-                    expand: false,
-                    initialChildSize: 0.85,
-                    minChildSize: 0.5,
-                    maxChildSize: 0.95,
-                    builder: (_, __) => MovieDetailsPane(item: items[i]),
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.95,
                   ),
+                  builder: (_) => MovieDetailsPane(item: items[i]),
                 );
               }
             },
@@ -166,13 +173,11 @@ class _Poster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final border = selected
-        ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
-        : null;
+    final primary = Theme.of(context).colorScheme.primary;
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: border?.top ?? BorderSide.none,
+        side: selected ? BorderSide(color: primary, width: 2) : BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -217,10 +222,11 @@ class _Chip extends StatelessWidget {
   const _Chip({required this.text});
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(text, style: Theme.of(context).textTheme.labelSmall),
@@ -235,107 +241,90 @@ class MovieDetailsPane extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    item.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Copy URL',
-                  onPressed: () async {
-                    await Clipboard.setData(
-                      ClipboardData(text: item.streamUrl),
-                    );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('URL copied')),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.copy),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: (item.logo ?? '').isNotEmpty
-                  ? Image.network(
-                      item.logo!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const ColoredBox(color: Color(0xFF111111)),
-                    )
-                  : const ColoredBox(color: Color(0xFF111111)),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
+
+    return Material(
+      color: theme.colorScheme.surface,
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (c, bc) {
+            return Scrollbar(
+              thumbVisibility: true,
+              child: ListView(
+                padding: const EdgeInsets.all(12),
                 children: [
-                  _Chip(text: item.groupTitle ?? 'Movie'),
-                  _Chip(text: _hostOf(item.streamUrl)),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Copy URL',
+                        onPressed: () async {
+                          await Clipboard.setData(
+                            ClipboardData(text: item.streamUrl),
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('URL copied')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.copy),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: (item.logo ?? '').isNotEmpty
+                        ? Image.network(
+                            item.logo!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const ColoredBox(color: Color(0xFF111111)),
+                          )
+                        : const ColoredBox(color: Color(0xFF111111)),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _Chip(text: item.groupTitle ?? 'Movie'),
+                        _Chip(text: _hostOf(item.streamUrl)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: theme.dividerColor),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SelectableText(
+                        item.streamUrl,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _ActionsBar(streamUrl: item.streamUrl),
                 ],
               ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                border: Border.all(color: theme.dividerColor),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SelectableText(
-                item.streamUrl,
-                style: theme.textTheme.bodySmall,
-                maxLines: 3,
-              ),
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () =>
-                        _openUrlExternally(item.streamUrl, context),
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Watch'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      String? dir = await defaultDownloadDir();
-                      final vm = ref.read(listVmProvider.notifier);
-                      await vm.addOnly(item.streamUrl, dir);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Queued to Downloads')),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.download),
-                    label: const Text('Download'),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -347,6 +336,57 @@ class MovieDetailsPane extends ConsumerWidget {
     } catch (_) {
       return 'unknown';
     }
+  }
+}
+
+class _ActionsBar extends ConsumerWidget {
+  final String streamUrl;
+  const _ActionsBar({required this.streamUrl});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return LayoutBuilder(
+      builder: (c, bc) {
+        final narrow = bc.maxWidth < 360;
+        final children = [
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: () => _openUrlExternally(streamUrl, context),
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Watch'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final dir = await defaultDownloadDir();
+                await ref.read(listVmProvider.notifier).addOnly(streamUrl, dir);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Queued to Downloads')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.download),
+              label: const Text('Download'),
+            ),
+          ),
+        ];
+
+        if (narrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              children[0],
+              const SizedBox(height: 10),
+              children[2], // OutlinedButton wrapped
+            ],
+          );
+        }
+        return Row(children: children);
+      },
+    );
   }
 
   Future<void> _openUrlExternally(String url, BuildContext context) async {
