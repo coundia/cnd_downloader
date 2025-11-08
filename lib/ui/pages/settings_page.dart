@@ -3,126 +3,202 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../viewmodels/settings_vm.dart';
 
-class SettingsPage extends ConsumerWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final s = ref.watch(settingsVmProvider);
-    final vm = ref.read(settingsVmProvider.notifier);
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
 
-    final segCtrl = TextEditingController(text: s.segmentsPerFile.toString());
-    final partCtrl = TextEditingController(
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  late final TextEditingController segCtrl;
+  late final TextEditingController partCtrl;
+  late final TextEditingController maxCtrl;
+  late final TextEditingController uaCtrl;
+  late final TextEditingController refCtrl;
+  late final TextEditingController dirCtrl;
+  late final TextEditingController omdbCtrl;
+
+  bool _saving = false;
+  bool _obscureOmdb = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = ref.read(settingsVmProvider);
+    segCtrl = TextEditingController(text: s.segmentsPerFile.toString());
+    partCtrl = TextEditingController(
       text: (s.partSizeBytes / (1024 * 1024)).toStringAsFixed(0),
     );
-    final maxCtrl = TextEditingController(text: s.maxActiveFiles.toString());
-    final uaCtrl = TextEditingController(text: s.defaultUserAgent);
-    final refCtrl = TextEditingController(text: s.defaultReferer ?? '');
-    final dirCtrl = TextEditingController(text: s.downloadDir ?? '');
-    // NEW: OMDb key
-    final omdbCtrl = TextEditingController(text: s.omdbApiKey ?? '');
+    maxCtrl = TextEditingController(text: s.maxActiveFiles.toString());
+    uaCtrl = TextEditingController(text: s.defaultUserAgent);
+    refCtrl = TextEditingController(text: s.defaultReferer ?? '');
+    dirCtrl = TextEditingController(text: s.downloadDir ?? '');
+    omdbCtrl = TextEditingController(text: s.omdbApiKey ?? '');
+  }
+
+  @override
+  void dispose() {
+    segCtrl.dispose();
+    partCtrl.dispose();
+    maxCtrl.dispose();
+    uaCtrl.dispose();
+    refCtrl.dispose();
+    dirCtrl.dispose();
+    omdbCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = ref.read(settingsVmProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextField(
-            controller: segCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Segments per file'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: partCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Part size MB'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: maxCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Max active files'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: uaCtrl,
-            decoration: const InputDecoration(labelText: 'User-Agent'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: refCtrl,
-            decoration: const InputDecoration(labelText: 'Referer'),
-          ),
-          const SizedBox(height: 12),
-          // NEW: OMDb API key
-          TextField(
-            controller: omdbCtrl,
-            decoration: const InputDecoration(
-              labelText: 'OMDb API Key',
-              helperText:
-                  'Optional. Used to fetch movie summaries/posters from omdbapi.com',
+      body: AbsorbPointer(
+        absorbing: _saving,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _numField(segCtrl, 'Segments per file'),
+            const SizedBox(height: 12),
+            _numField(partCtrl, 'Part size MB'),
+            const SizedBox(height: 12),
+            _numField(maxCtrl, 'Max active files'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: uaCtrl,
+              decoration: const InputDecoration(labelText: 'User-Agent'),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: dirCtrl,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Download directory',
-                    hintText: '/Users/you/Downloads/FastDown',
+            const SizedBox(height: 12),
+            TextField(
+              controller: refCtrl,
+              decoration: const InputDecoration(labelText: 'Referer'),
+            ),
+            const SizedBox(height: 12),
+
+            // Download dir picker
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: dirCtrl,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Download directory',
+                      hintText: '/Users/you/Downloads/Cnd',
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.tonal(
-                onPressed: () async {
-                  final picked = await FilePicker.platform.getDirectoryPath();
-                  if (picked != null && picked.isNotEmpty) {
-                    dirCtrl.text = picked;
-                  }
-                },
-                child: const Text('Browse'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () {
-              vm.setSegments(int.tryParse(segCtrl.text) ?? s.segmentsPerFile);
-              vm.setPartSize(
-                ((double.tryParse(partCtrl.text) ??
-                            (s.partSizeBytes / (1024 * 1024))) *
-                        1024 *
-                        1024)
-                    .toInt(),
-              );
-              vm.setMaxActive(int.tryParse(maxCtrl.text) ?? s.maxActiveFiles);
-              vm.setUa(
-                uaCtrl.text.trim().isEmpty
-                    ? s.defaultUserAgent
-                    : uaCtrl.text.trim(),
-              );
-              vm.setReferer(
-                refCtrl.text.trim().isEmpty ? null : refCtrl.text.trim(),
-              );
-              vm.setDownloadDir(
-                dirCtrl.text.trim().isEmpty ? null : dirCtrl.text.trim(),
-              );
-              // NEW: save OMDb key
-              vm.setOmdbKey(
-                omdbCtrl.text.trim().isEmpty ? null : omdbCtrl.text.trim(),
-              );
+                const SizedBox(width: 8),
+                FilledButton.tonal(
+                  onPressed: () async {
+                    final picked = await FilePicker.platform.getDirectoryPath();
+                    if (picked != null && picked.isNotEmpty) {
+                      setState(() => dirCtrl.text = picked);
+                    }
+                  },
+                  child: const Text('Browse'),
+                ),
+              ],
+            ),
 
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
+            const SizedBox(height: 12),
+
+            // OMDb key
+            TextField(
+              controller: omdbCtrl,
+              obscureText: _obscureOmdb,
+              enableSuggestions: false,
+              autocorrect: false,
+              decoration: InputDecoration(
+                labelText: 'OMDb API Key',
+                suffixIcon: IconButton(
+                  onPressed: () => setState(() => _obscureOmdb = !_obscureOmdb),
+                  icon: Icon(
+                    _obscureOmdb ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  tooltip: _obscureOmdb ? 'Show' : 'Hide',
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            FilledButton(
+              onPressed: _saving
+                  ? null
+                  : () async {
+                      FocusScope.of(context).unfocus();
+                      setState(() => _saving = true);
+                      try {
+                        vm.setSegments(
+                          int.tryParse(segCtrl.text) ??
+                              ref.read(settingsVmProvider).segmentsPerFile,
+                        );
+                        vm.setPartSize(
+                          (((double.tryParse(partCtrl.text) ??
+                                      (ref
+                                              .read(settingsVmProvider)
+                                              .partSizeBytes /
+                                          (1024 * 1024)))) *
+                                  1024 *
+                                  1024)
+                              .toInt(),
+                        );
+                        vm.setMaxActive(
+                          int.tryParse(maxCtrl.text) ??
+                              ref.read(settingsVmProvider).maxActiveFiles,
+                        );
+                        vm.setUa(
+                          uaCtrl.text.trim().isEmpty
+                              ? ref.read(settingsVmProvider).defaultUserAgent
+                              : uaCtrl.text.trim(),
+                        );
+                        vm.setReferer(
+                          refCtrl.text.trim().isEmpty
+                              ? null
+                              : refCtrl.text.trim(),
+                        );
+                        vm.setDownloadDir(
+                          dirCtrl.text.trim().isEmpty
+                              ? null
+                              : dirCtrl.text.trim(),
+                        );
+                        vm.setOmdbKey(
+                          omdbCtrl.text.trim().isEmpty
+                              ? null
+                              : omdbCtrl.text.trim(),
+                        );
+
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Settings saved')),
+                        );
+                        // Do NOT pop here. Avoids the black flash caused by popping during layout.
+                      } finally {
+                        if (mounted) setState(() => _saving = false);
+                      }
+                    },
+              child: _saving
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save'),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _numField(TextEditingController c, String label) {
+    return TextField(
+      controller: c,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: label),
     );
   }
 }

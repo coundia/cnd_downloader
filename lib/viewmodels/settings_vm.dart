@@ -95,6 +95,7 @@ class SettingsVm extends StateNotifier<RuntimeSettings> {
     _save();
   }
 
+  // in SettingsVm
   void setOmdbKey(String? key) {
     final nv = (key == null || key.trim().isEmpty) ? null : key.trim();
     state = state.copyWith(omdbApiKey: nv);
