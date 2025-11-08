@@ -1,10 +1,6 @@
 import 'dart:collection';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/paths.dart';
-import '../../../viewmodels/download_list_vm.dart';
 import '../../../viewmodels/iptv_vm.dart';
 import '../../../data/iptv_models.dart';
 import 'movies/widgets/movie_details_pane.dart';
@@ -23,6 +19,12 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
   String q = '';
   String? group;
   String? host;
+
+  // Tri
+  static const _sortKeys = <String>['Name', 'Group', 'Host'];
+  String sortKey = _sortKeys.first;
+  bool sortAsc = true;
+
   IptvItem? selected;
 
   @override
@@ -37,6 +39,7 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
           final allGroups = _uniqueGroups(list);
           final allHosts = _uniqueHosts(list);
 
+          // Filtre
           final filtered = list.where((e) {
             final mQuery =
                 q.isEmpty ||
@@ -52,6 +55,32 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
             return mQuery && mGroup && mHost;
           }).toList();
 
+          // Tri
+          filtered.sort((a, b) {
+            int res;
+            switch (sortKey) {
+              case 'Group':
+                res = (a.groupTitle ?? 'Other').toLowerCase().compareTo(
+                  (b.groupTitle ?? 'Other').toLowerCase(),
+                );
+                break;
+              case 'Host':
+                res = _safeHost(
+                  a.streamUrl,
+                ).toLowerCase().compareTo(_safeHost(b.streamUrl).toLowerCase());
+                break;
+              case 'Name':
+              default:
+                res = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+                break;
+            }
+            if (res == 0) {
+              // Dénominateur commun pour stabilité
+              res = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+            }
+            return sortAsc ? res : -res;
+          });
+
           if (filtered.isEmpty) {
             return Column(
               children: [
@@ -64,6 +93,15 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                   hosts: allHosts,
                   selectedHost: host,
                   onSelectHost: (v) => setState(() => host = v),
+                  sortKeys: _sortKeys,
+                  selectedSortKey: sortKey,
+                  onSelectSortKey: (v) => setState(
+                    () => sortKey = (v == null || v.isEmpty)
+                        ? _sortKeys.first
+                        : v,
+                  ),
+                  sortAsc: sortAsc,
+                  onToggleAsc: () => setState(() => sortAsc = !sortAsc),
                 ),
                 const Divider(height: 1),
                 const Expanded(child: Center(child: Text('No movie found'))),
@@ -83,6 +121,7 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
               );
 
               if (!wide) {
+                // Stack mobile: barre en haut, grille en dessous
                 return Column(
                   children: [
                     SearchFilterBar(
@@ -94,6 +133,15 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                       hosts: allHosts,
                       selectedHost: host,
                       onSelectHost: (v) => setState(() => host = v),
+                      sortKeys: _sortKeys,
+                      selectedSortKey: sortKey,
+                      onSelectSortKey: (v) => setState(
+                        () => sortKey = (v == null || v.isEmpty)
+                            ? _sortKeys.first
+                            : v,
+                      ),
+                      sortAsc: sortAsc,
+                      onToggleAsc: () => setState(() => sortAsc = !sortAsc),
                     ),
                     const Divider(height: 1),
                     Expanded(child: grid),
@@ -101,6 +149,7 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                 );
               }
 
+              // Large: grille à gauche, panneau détails à droite
               final sel = selected ?? filtered.first;
               return Row(
                 children: [
@@ -117,6 +166,15 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                           hosts: allHosts,
                           selectedHost: host,
                           onSelectHost: (v) => setState(() => host = v),
+                          sortKeys: _sortKeys,
+                          selectedSortKey: sortKey,
+                          onSelectSortKey: (v) => setState(
+                            () => sortKey = (v == null || v.isEmpty)
+                                ? _sortKeys.first
+                                : v,
+                          ),
+                          sortAsc: sortAsc,
+                          onToggleAsc: () => setState(() => sortAsc = !sortAsc),
                         ),
                         const Divider(height: 1),
                         Expanded(child: grid),
