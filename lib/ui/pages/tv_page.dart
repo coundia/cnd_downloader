@@ -8,6 +8,9 @@ import '../../data/iptv_models.dart';
 import '../../core/settings.dart';
 import '../widgets/cnd_video_player.dart';
 
+// NEW
+import '../../state/favorites_store.dart';
+
 class TvPage extends ConsumerStatefulWidget {
   const TvPage({super.key});
   @override
@@ -24,7 +27,7 @@ class _TvPageState extends ConsumerState<TvPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TV'),
+    
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -47,43 +50,131 @@ class _TvPageState extends ConsumerState<TvPage> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => const Center(child: Text('Erreur')),
             data: (list) {
+              // filtre texte
               final filtered = q.isEmpty
                   ? list
                   : list
-                        .where(
-                          (e) => ('${e.name} ${e.groupTitle ?? ''}')
-                              .toLowerCase()
-                              .contains(q),
-                        )
-                        .toList();
+                      .where(
+                        (e) => ('${e.name} ${e.groupTitle ?? ''}')
+                            .toLowerCase()
+                            .contains(q),
+                      )
+                      .toList();
+
               if (filtered.isEmpty) {
                 return const Center(child: Text('Aucune chaîne'));
               }
+
+              // favoris actuels
+              final favIds = ref.watch(favoritesProvider);
+              final favItems =
+                  filtered.where((e) => favIds.contains(e.id)).toList();
+
               return LayoutBuilder(
                 builder: (c, bc) {
                   final w = bc.maxWidth;
                   final cross = w >= 1600
                       ? 6
                       : w >= 1200
-                      ? 5
-                      : w >= 900
-                      ? 4
-                      : w >= 600
-                      ? 3
-                      : 2;
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(12),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: cross,
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 10,
-                      childAspectRatio: 2.6,
-                    ),
-                    itemCount: filtered.length,
-                    itemBuilder: (c, i) => _ChannelCard(
-                      item: filtered[i],
-                      onPlay: () => _openPlayer(filtered[i]),
-                    ),
+                          ? 5
+                          : w >= 900
+                              ? 4
+                              : w >= 600
+                                  ? 3
+                                  : 2;
+
+                  return CustomScrollView(
+                    slivers: [
+                      if (favItems.isNotEmpty) ...[
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                          sliver: const SliverToBoxAdapter(
+                            child: Text(
+                              'Favoris',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          sliver: SliverGrid(
+                            delegate: SliverChildBuilderDelegate(
+                              (ctx, i) {
+                                final it = favItems[i];
+                                final isFav = favIds.contains(it.id);
+                                return _ChannelCard(
+                                  item: it,
+                                  isFavorite: isFav,
+                                  onToggleFavorite: () => ref
+                                      .read(favoritesProvider.notifier)
+                                      .toggle(it.id),
+                                  onPlay: () => _openPlayer(it),
+                                );
+                              },
+                              childCount: favItems.length,
+                            ),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: cross,
+                              mainAxisSpacing: 10,
+                              crossAxisSpacing: 10,
+                              childAspectRatio: 2.6,
+                            ),
+                          ),
+                        ),
+                        const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Divider(height: 1),
+                          ),
+                        ),
+                      ],
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                        sliver: const SliverToBoxAdapter(
+                          child: Text(
+                            'Toutes les chaînes',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        sliver: SliverGrid(
+                          delegate: SliverChildBuilderDelegate(
+                            (ctx, i) {
+                              final it = filtered[i];
+                              final isFav = favIds.contains(it.id);
+                              return _ChannelCard(
+                                item: it,
+                                isFavorite: isFav,
+                                onToggleFavorite: () => ref
+                                    .read(favoritesProvider.notifier)
+                                    .toggle(it.id),
+                                onPlay: () => _openPlayer(it),
+                              );
+                            },
+                            childCount: filtered.length,
+                          ),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: cross,
+                            mainAxisSpacing: 10,
+                            crossAxisSpacing: 10,
+                            childAspectRatio: 2.6,
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 },
               );
@@ -106,16 +197,16 @@ class _TvPageState extends ConsumerState<TvPage> {
         ? it.userAgent!.trim()
         : settings.defaultUserAgent.trim();
     if (ua.isNotEmpty) map['user-agent'] = ua;
-    final ref = (it.referer ?? '').trim().isNotEmpty
+    final refh = (it.referer ?? '').trim().isNotEmpty
         ? it.referer!.trim()
         : (settings.defaultReferer ?? '').trim();
-    if (ref.isNotEmpty) map['referer'] = ref;
+    if (refh.isNotEmpty) map['referer'] = refh;
     final hj = (it.headersJson ?? '').trim();
     if (hj.isNotEmpty) {
       try {
         final m = Map<String, dynamic>.from(json.decode(hj) as Map);
         m.forEach((k, v) {
-          final key = k.toString().toLowerCase();
+          final key = k.toString();
           final val = v?.toString() ?? '';
           if (val.isNotEmpty) map[key] = val;
         });
@@ -139,7 +230,17 @@ class _TvPageState extends ConsumerState<TvPage> {
 class _ChannelCard extends StatelessWidget {
   final IptvItem item;
   final VoidCallback onPlay;
-  const _ChannelCard({required this.item, required this.onPlay});
+
+  // NEW
+  final bool isFavorite;
+  final VoidCallback onToggleFavorite;
+
+  const _ChannelCard({
+    required this.item,
+    required this.onPlay,
+    required this.isFavorite,
+    required this.onToggleFavorite,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -165,20 +266,28 @@ class _ChannelCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text(item.name,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
                     Text(
                       item.groupTitle ?? '',
                       style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 6),
+              IconButton(
+                tooltip: isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris',
+                onPressed: onToggleFavorite,
+                icon: Icon(
+                  isFavorite ? Icons.star : Icons.star_border,
+                  color: isFavorite ? Colors.amber : null,
+                ),
+              ),
+              const SizedBox(width: 4),
               const Icon(Icons.play_arrow),
             ],
           ),
@@ -209,9 +318,8 @@ class _LivePlayerPage extends StatelessWidget {
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: url));
               if (!context.mounted) return;
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('URL copiée')));
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(content: Text('URL copiée')));
             },
             icon: const Icon(Icons.copy),
           ),

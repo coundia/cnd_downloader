@@ -29,6 +29,8 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   final List<double> _speeds = const [0.5, 1.0, 1.25, 1.5, 2.0];
   int _speedIx = 1;
 
+  Duration get currentPosition => _c?.value.position ?? Duration.zero;
+
   @override
   void initState() {
     super.initState();
@@ -102,27 +104,21 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     final c = _c;
     if (c == null) return;
 
-    // État courant
     final wasPlaying = c.value.isPlaying;
     final pos = c.value.position;
-    final curVol = c.value.volume;
-    final curSpeed = _speeds[_speedIx];
 
-    // Stopper le flux courant avant d’ouvrir le plein écran
     _hideT?.cancel();
     await c.pause();
 
-    // Ouvrir le plein écran avec reprise à la même position
+    final key = GlobalKey<_CndVideoPlayerState>();
     final returnedPos = await Navigator.of(context).push<Duration?>(
       PageRouteBuilder(
         opaque: true,
         barrierColor: Colors.black,
         pageBuilder: (_, __, ___) => _FullscreenVideo(
+          playerKey: key,
           url: widget.url,
           headers: widget.headers,
-          startAt: pos,
-          speed: curSpeed,
-          volume: curVol,
           autoPlay: wasPlaying,
         ),
         transitionsBuilder: (_, a, __, child) =>
@@ -132,12 +128,10 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
 
     if (!mounted) return;
 
-    // Revenir à la position rendue par le plein écran
-    if (returnedPos != null) {
-      await c.seekTo(returnedPos);
-    }
+    // Si aucune position n’a été renvoyée, on reprend là où on s’était arrêté
+    final resumeAt = returnedPos ?? pos;
+    await c.seekTo(resumeAt);
 
-    // Rejouer si la vidéo jouait avant le plein écran
     if (wasPlaying) {
       await c.play();
       _show = true;
@@ -207,8 +201,9 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     final ratio = live
         ? 0.0
         : (dur.inMilliseconds == 0
-              ? 0.0
-              : pos.inMilliseconds / dur.inMilliseconds.clamp(1, 1 << 31));
+            ? 0.0
+            : pos.inMilliseconds /
+                dur.inMilliseconds.clamp(1, 1 << 31));
 
     final controls = FittedBox(
       fit: BoxFit.scaleDown,
@@ -224,9 +219,8 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 2.5,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 6,
-                    ),
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 6),
                   ),
                   child: Slider(
                     value: ratio.clamp(0.0, 1.0),
@@ -306,7 +300,10 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                     constraints: const BoxConstraints(),
                     iconSize: 22,
                     onPressed: widget.isFullscreen
-                        ? Navigator.of(context).maybePop
+                        ? () {
+                            final p = _c?.value.position ?? Duration.zero;
+                            Navigator.of(context).pop<Duration?>(p);
+                          }
                         : _enterFullscreen,
                     icon: Icon(
                       widget.isFullscreen
@@ -314,9 +311,8 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                           : Icons.fullscreen,
                       color: Colors.white,
                     ),
-                    tooltip: widget.isFullscreen
-                        ? 'Exit full screen'
-                        : 'Full screen',
+                    tooltip:
+                        widget.isFullscreen ? 'Exit full screen' : 'Full screen',
                   ),
                 ],
               ),
@@ -331,9 +327,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     return AspectRatio(
       aspectRatio: aspect,
       child: GestureDetector(
-        onTap: () {
-          _toggleControls();
-        },
+        onTap: _toggleControls,
         onDoubleTapDown: (d) {
           final w = MediaQuery.of(context).size.width;
           final x = d.globalPosition.dx;
@@ -365,16 +359,18 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
               left: 8,
               top: 8,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  live ? 'LIVE' : 'VOD',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(color: Colors.white),
+                  (v.duration == Duration.zero) ? 'LIVE' : 'VOD',
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: Colors.white),
                 ),
               ),
             ),
@@ -397,19 +393,15 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
 }
 
 class _FullscreenVideo extends StatefulWidget {
+  final GlobalKey<_CndVideoPlayerState> playerKey;
   final String url;
   final Map<String, String>? headers;
-  final Duration startAt;
-  final double speed;
-  final double volume;
   final bool autoPlay;
 
   const _FullscreenVideo({
+    required this.playerKey,
     required this.url,
     required this.headers,
-    required this.startAt,
-    required this.speed,
-    required this.volume,
     required this.autoPlay,
   });
 
@@ -441,101 +433,30 @@ class _FullscreenVideoState extends State<_FullscreenVideo> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        left: false,
-        right: false,
-        top: false,
-        bottom: false,
-        child: Center(
-          child: _FullscreenPlayerBody(
-            url: widget.url,
-            headers: widget.headers,
-            startAt: widget.startAt,
-            speed: widget.speed,
-            volume: widget.volume,
-            autoPlay: widget.autoPlay,
+    return WillPopScope(
+      onWillPop: () async {
+        final pos =
+            widget.playerKey.currentState?.currentPosition ?? Duration.zero;
+        Navigator.of(context).pop<Duration?>(pos);
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          left: false,
+          right: false,
+          top: false,
+          bottom: false,
+          child: Center(
+            child: CndVideoPlayer(
+              key: widget.playerKey,
+              url: widget.url,
+              headers: widget.headers,
+              autoPlay: widget.autoPlay,
+              isFullscreen: true,
+            ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _FullscreenPlayerBody extends StatefulWidget {
-  final String url;
-  final Map<String, String>? headers;
-  final Duration startAt;
-  final double speed;
-  final double volume;
-  final bool autoPlay;
-
-  const _FullscreenPlayerBody({
-    required this.url,
-    required this.headers,
-    required this.startAt,
-    required this.speed,
-    required this.volume,
-    required this.autoPlay,
-  });
-
-  @override
-  State<_FullscreenPlayerBody> createState() => _FullscreenPlayerBodyState();
-}
-
-class _FullscreenPlayerBodyState extends State<_FullscreenPlayerBody> {
-  VideoPlayerController? _c;
-
-  @override
-  void initState() {
-    super.initState();
-    _open();
-  }
-
-  @override
-  void dispose() {
-    final pos = _c?.value.position ?? Duration.zero;
-    Navigator.of(context).pop<Duration?>(pos);
-    _c?.dispose();
-    super.dispose();
-  }
-
-  Future<void> _open() async {
-    final c = VideoPlayerController.networkUrl(
-      Uri.parse(widget.url),
-      httpHeaders: widget.headers ?? const <String, String>{},
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
-    _c = c;
-    await c.initialize();
-    await c.setPlaybackSpeed(widget.speed);
-    await c.setVolume(widget.volume);
-    if (widget.startAt > Duration.zero) {
-      await c.seekTo(widget.startAt);
-    }
-    if (widget.autoPlay) await c.play();
-    if (!mounted) return;
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = _c;
-    if (c == null || !c.value.isInitialized) {
-      return const AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Center(child: CircularProgressIndicator(color: Colors.white)),
-      );
-    }
-    final ar = c.value.aspectRatio == 0 ? (16 / 9) : c.value.aspectRatio;
-    return AspectRatio(
-      aspectRatio: ar,
-      child: CndVideoPlayer(
-        url: widget.url,
-        headers: widget.headers,
-        autoPlay: true,
-        isFullscreen: true,
       ),
     );
   }
