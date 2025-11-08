@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'ui/pages/shell_page.dart';
 import 'ui/pages/home_page.dart';
 import 'ui/pages/settings_page.dart';
 
@@ -10,7 +11,8 @@ class FastDownApp extends StatelessWidget {
       title: 'CND Downloader',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.teal),
       routes: {
-        '/': (_) => const HomePage(),
+        '/': (_) => const ShellPage(),
+        '/downloads': (_) => const HomePage(),
         '/settings': (_) => const SettingsPage(),
       },
     );
