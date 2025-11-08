@@ -1,8 +1,10 @@
 import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../viewmodels/iptv_vm.dart';
 import '../../data/iptv_models.dart';
+import 'seriesCard.dart';
 import 'series_details_page.dart';
 
 class SeriesPage extends ConsumerStatefulWidget {
@@ -12,7 +14,28 @@ class SeriesPage extends ConsumerStatefulWidget {
 }
 
 class _SeriesPageState extends ConsumerState<SeriesPage> {
+  static const _prefKeyGroup = 'series.selectedGroup';
+
   String q = '';
+  String? group;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedGroup();
+  }
+
+  Future<void> _loadSavedGroup() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_prefKeyGroup);
+    if (!mounted) return;
+    setState(() => group = (saved == null || saved.isEmpty) ? null : saved);
+  }
+
+  Future<void> _persistGroup(String? g) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefKeyGroup, g ?? '');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,19 +63,27 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(child: Text('Erreur')),
         data: (list) {
-          final filtered = _filter(list, q);
+          final allGroups = _uniqueGroups(list);
+          if (group != null && !allGroups.contains(group)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (!mounted) return;
+              setState(() => group = null);
+              await _persistGroup(null);
+            });
+          }
+
+          final filtered = _filter(list, q, group);
           if (filtered.isEmpty) {
             return const Center(child: Text('Aucune série'));
           }
           final grouped = _groupBySeries(filtered);
           final seriesCards = grouped.entries.map((e) {
             final episodes = e.value;
-            // Choisir un poster représentatif
             final poster = episodes.firstWhere(
               (it) => (it.logo ?? '').isNotEmpty,
               orElse: () => episodes.first,
             );
-            return _SeriesCard(
+            return SeriesCard(
               title: e.key,
               posterUrl: poster.logo,
               count: episodes.length,
@@ -67,53 +98,71 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
             );
           }).toList();
 
-          return LayoutBuilder(
-            builder: (c, bc) {
-              final w = bc.maxWidth;
-              final cross = w >= 1600
-                  ? 7
-                  : w >= 1200
-                  ? 6
-                  : w >= 900
-                  ? 5
-                  : w >= 600
-                  ? 4
-                  : 3;
-              return GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: cross,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: .72,
+          return Column(
+            children: [
+              _GroupChipsBar(
+                groups: allGroups,
+                selected: group,
+                onSelect: (g) async {
+                  final sel = (g == null || g.isEmpty) ? null : g;
+                  setState(() => group = sel);
+                  await _persistGroup(sel);
+                },
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (c, bc) {
+                    final w = bc.maxWidth;
+                    final cross = w >= 1600
+                        ? 7
+                        : w >= 1200
+                        ? 6
+                        : w >= 900
+                        ? 5
+                        : w >= 600
+                        ? 4
+                        : 3;
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: cross,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: .72,
+                      ),
+                      itemCount: seriesCards.length,
+                      itemBuilder: (_, i) => seriesCards[i],
+                    );
+                  },
                 ),
-                itemCount: seriesCards.length,
-                itemBuilder: (_, i) => seriesCards[i],
-              );
-            },
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  List<IptvItem> _filter(List<IptvItem> list, String q) {
-    if (q.isEmpty) return list;
-    return list
-        .where(
-          (e) => ('${e.name} ${e.groupTitle ?? ''}').toLowerCase().contains(q),
-        )
-        .toList();
+  List<IptvItem> _filter(List<IptvItem> list, String q, String? group) {
+    final ql = q.toLowerCase().trim();
+    return list.where((e) {
+      final hitQuery =
+          ql.isEmpty ||
+          ('${e.name} ${e.groupTitle ?? ''}').toLowerCase().contains(ql);
+      final hitGroup =
+          (group == null || group.isEmpty) ||
+          (e.groupTitle ?? 'Other') == group;
+      return hitQuery && hitGroup;
+    }).toList();
   }
 
-  // Regroupe par “clé série” (nom nettoyé sans SxxEyy, tags, qualité…)
   Map<String, List<IptvItem>> _groupBySeries(List<IptvItem> list) {
     final map = SplayTreeMap<String, List<IptvItem>>((a, b) => a.compareTo(b));
     for (final it in list) {
       final key = _seriesKey(it.name);
       map.putIfAbsent(key, () => <IptvItem>[]).add(it);
     }
-    // tri interne par saison/épisode
     for (final episodes in map.values) {
       episodes.sort((a, b) {
         final as = _parseSeason(a.name);
@@ -175,74 +224,54 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
       caseSensitive: false,
     ).firstMatch(name);
     if (m2 != null) return int.tryParse(m2.group(1)!) ?? 1;
-    // fallback: nombre en fin
     final m3 = RegExp(r'(\d{1,3})$').firstMatch(name.trim());
     if (m3 != null) return int.tryParse(m3.group(1)!) ?? 1;
     return 1;
   }
+
+  List<String> _uniqueGroups(List<IptvItem> list) {
+    final set = SplayTreeSet<String>();
+    for (final e in list) {
+      set.add((e.groupTitle ?? 'Other').trim());
+    }
+    return [''].followedBy(set).toList();
+  }
 }
 
-class _SeriesCard extends StatelessWidget {
-  final String title;
-  final String? posterUrl;
-  final int count;
-  final VoidCallback onTap;
-  const _SeriesCard({
-    required this.title,
-    required this.posterUrl,
-    required this.count,
-    required this.onTap,
+class _GroupChipsBar extends StatelessWidget {
+  final List<String> groups;
+  final String? selected;
+  final ValueChanged<String?> onSelect;
+
+  const _GroupChipsBar({
+    required this.groups,
+    required this.selected,
+    required this.onSelect,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          children: [
-            AspectRatio(
-              aspectRatio: 2 / 3,
-              child: (posterUrl ?? '').isNotEmpty
-                  ? Image.network(
-                      posterUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const ColoredBox(color: Color(0xFFEEEEEE)),
-                    )
-                  : const ColoredBox(color: Color(0xFFEEEEEE)),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text('$count'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    if (groups.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        scrollDirection: Axis.horizontal,
+        itemCount: groups.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final g = groups[i];
+          final isAll = g.isEmpty;
+          final label = isAll ? 'Tous' : g;
+          final sel = (selected == null || selected!.isEmpty)
+              ? isAll
+              : selected == g;
+          return ChoiceChip(
+            label: Text(label, overflow: TextOverflow.ellipsis),
+            selected: sel,
+            onSelected: (_) => onSelect(isAll ? '' : g),
+          );
+        },
       ),
     );
   }
