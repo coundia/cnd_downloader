@@ -15,14 +15,17 @@ class SeriesPage extends ConsumerStatefulWidget {
 
 class _SeriesPageState extends ConsumerState<SeriesPage> {
   static const _prefKeyGroup = 'series.selectedGroup';
+  static const _prefKeyFavs = 'series.favs';
 
   String q = '';
   String? group;
+  final Set<String> _favs = {};
 
   @override
   void initState() {
     super.initState();
     _loadSavedGroup();
+    _loadSavedFavs();
   }
 
   Future<void> _loadSavedGroup() async {
@@ -37,12 +40,38 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
     await prefs.setString(_prefKeyGroup, g ?? '');
   }
 
+  Future<void> _loadSavedFavs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_prefKeyFavs) ?? const <String>[];
+    if (!mounted) return;
+    setState(() {
+      _favs
+        ..clear()
+        ..addAll(list);
+    });
+  }
+
+  Future<void> _persistFavs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_prefKeyFavs, _favs.toList());
+  }
+
+  void _toggleFav(String seriesKey) async {
+    setState(() {
+      if (_favs.contains(seriesKey)) {
+        _favs.remove(seriesKey);
+      } else {
+        _favs.add(seriesKey);
+      }
+    });
+    await _persistFavs();
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = ref.watch(seriesProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Séries'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -76,8 +105,16 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
           if (filtered.isEmpty) {
             return const Center(child: Text('Aucune série'));
           }
+
           final grouped = _groupBySeries(filtered);
-          final seriesCards = grouped.entries.map((e) {
+          final favEntries = grouped.entries
+              .where((e) => _favs.contains(e.key))
+              .toList();
+          final otherEntries = grouped.entries
+              .where((e) => !_favs.contains(e.key))
+              .toList();
+
+          Widget buildCard(MapEntry<String, List<IptvItem>> e) {
             final episodes = e.value;
             final poster = episodes.firstWhere(
               (it) => (it.logo ?? '').isNotEmpty,
@@ -87,6 +124,8 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
               title: e.key,
               posterUrl: poster.logo,
               count: episodes.length,
+              isFavorite: _favs.contains(e.key),
+              onToggleFavorite: () => _toggleFav(e.key),
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -96,7 +135,7 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
                 );
               },
             );
-          }).toList();
+          }
 
           return Column(
             children: [
@@ -110,6 +149,34 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
                 },
               ),
               const Divider(height: 1),
+              if (favEntries.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Favoris',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: 270,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    scrollDirection: Axis.horizontal,
+                    itemBuilder: (_, i) =>
+                        SizedBox(width: 160, child: buildCard(favEntries[i])),
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemCount: favEntries.length,
+                  ),
+                ),
+                const Divider(height: 1),
+              ],
               Expanded(
                 child: LayoutBuilder(
                   builder: (c, bc) {
@@ -131,8 +198,8 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
                         crossAxisSpacing: 10,
                         childAspectRatio: .72,
                       ),
-                      itemCount: seriesCards.length,
-                      itemBuilder: (_, i) => seriesCards[i],
+                      itemCount: otherEntries.length,
+                      itemBuilder: (_, i) => buildCard(otherEntries[i]),
                     );
                   },
                 ),

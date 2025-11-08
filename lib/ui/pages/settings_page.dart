@@ -55,7 +55,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
         actions: [
           IconButton(
             tooltip: 'Home',
