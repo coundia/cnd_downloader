@@ -4,11 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/iptv_models.dart';
 import '../../../viewmodels/iptv_vm.dart';
 import 'movies/movie_details_page.dart';
-import 'movies/widgets/movie_details_pane.dart';
 import 'movies/widgets/movie_grid.dart';
 import 'widgets/search_filter_bar.dart';
 import 'widgets/movie_grid.dart';
-import 'widgets/movie_details_pane.dart';
 
 class MoviesPage extends ConsumerStatefulWidget {
   const MoviesPage({super.key});
@@ -22,11 +20,11 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
   String? host;
   String sortKey = 'Name';
   bool sortAsc = true;
-  IptvItem? selected;
 
   @override
   Widget build(BuildContext context) {
     final items = ref.watch(moviesProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Movies')),
       body: items.when(
@@ -77,90 +75,38 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
             );
           }
 
-          return LayoutBuilder(
-            builder: (c, bc) {
-              final wide = bc.maxWidth >= 1100;
-              final detailsW = _clamp(bc.maxWidth * 0.34, 320, 480);
+          void onPick(IptvItem it) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => MovieDetailsPage(item: it)),
+            );
+          }
 
-              void onPick(IptvItem it) {
-                if (wide) {
-                  setState(() => selected = it);
-                } else {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => MovieDetailsPage(item: it),
-                    ),
-                  );
-                }
-              }
+          final grid = MovieGrid(
+            items: filtered,
+            selected: null,
+            onSelect: onPick,
+          );
 
-              final grid = MovieGrid(
-                items: filtered,
-                selected: selected,
-                onSelect: onPick,
-              );
-
-              if (!wide) {
-                return Column(
-                  children: [
-                    SearchFilterBar(
-                      query: q,
-                      onQuery: (v) => setState(() => q = v),
-                      groups: allGroups,
-                      selectedGroup: group,
-                      onSelectGroup: (v) => setState(() => group = v),
-                      hosts: allHosts,
-                      selectedHost: host,
-                      onSelectHost: (v) => setState(() => host = v),
-                      sortKeys: const ['Name', 'Group', 'Host'],
-                      selectedSortKey: sortKey,
-                      onSelectSortKey: (v) =>
-                          setState(() => sortKey = v ?? 'Name'),
-                      sortAsc: sortAsc,
-                      onToggleAsc: () => setState(() => sortAsc = !sortAsc),
-                    ),
-                    const Divider(height: 1),
-                    Expanded(child: grid),
-                  ],
-                );
-              }
-
-              final sel = selected ?? filtered.first;
-              return Row(
-                children: [
-                  SizedBox(
-                    width: bc.maxWidth - detailsW - 1,
-                    child: Column(
-                      children: [
-                        SearchFilterBar(
-                          query: q,
-                          onQuery: (v) => setState(() => q = v),
-                          groups: allGroups,
-                          selectedGroup: group,
-                          onSelectGroup: (v) => setState(() => group = v),
-                          hosts: allHosts,
-                          selectedHost: host,
-                          onSelectHost: (v) => setState(() => host = v),
-                          sortKeys: const ['Name', 'Group', 'Host'],
-                          selectedSortKey: sortKey,
-                          onSelectSortKey: (v) =>
-                              setState(() => sortKey = v ?? 'Name'),
-                          sortAsc: sortAsc,
-                          onToggleAsc: () => setState(() => sortAsc = !sortAsc),
-                        ),
-                        const Divider(height: 1),
-                        Expanded(child: grid),
-                      ],
-                    ),
-                  ),
-                  const VerticalDivider(width: 1),
-                  SizedBox(
-                    width: detailsW,
-                    child: MovieDetailsPane(item: sel),
-                  ),
-                ],
-              );
-            },
+          return Column(
+            children: [
+              SearchFilterBar(
+                query: q,
+                onQuery: (v) => setState(() => q = v),
+                groups: allGroups,
+                selectedGroup: group,
+                onSelectGroup: (v) => setState(() => group = v),
+                hosts: allHosts,
+                selectedHost: host,
+                onSelectHost: (v) => setState(() => host = v),
+                sortKeys: const ['Name', 'Group', 'Host'],
+                selectedSortKey: sortKey,
+                onSelectSortKey: (v) => setState(() => sortKey = v ?? 'Name'),
+                sortAsc: sortAsc,
+                onToggleAsc: () => setState(() => sortAsc = !sortAsc),
+              ),
+              const Divider(height: 1),
+              Expanded(child: grid),
+            ],
           );
         },
       ),
@@ -213,11 +159,5 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
     }
 
     list.sort(cmp);
-  }
-
-  double _clamp(double v, double min, double max) {
-    if (v < min) return min;
-    if (v > max) return max;
-    return v;
   }
 }
