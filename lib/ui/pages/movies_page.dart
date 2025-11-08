@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/iptv_models.dart';
 import '../../../viewmodels/iptv_vm.dart';
 import 'movies/movie_details_page.dart';
@@ -14,11 +15,31 @@ class MoviesPage extends ConsumerStatefulWidget {
 }
 
 class _MoviesPageState extends ConsumerState<MoviesPage> {
+  static const _prefKeyGroup = 'movies.selectedGroup';
+
   String q = '';
   String? group;
   String? host;
   String sortKey = 'Name';
   bool sortAsc = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedGroup();
+  }
+
+  Future<void> _loadSavedGroup() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_prefKeyGroup);
+    if (!mounted) return;
+    setState(() => group = (saved == null || saved.isEmpty) ? null : saved);
+  }
+
+  Future<void> _persistGroup(String? g) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefKeyGroup, g ?? '');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +50,16 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(child: Text('Error')),
         data: (list) {
-          final allGroups = _uniqueGroups(list); // includes '' for "All"
+          final allGroups = _uniqueGroups(list);
           final allHosts = _uniqueHosts(list);
+
+          if (group != null && !allGroups.contains(group)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (!mounted) return;
+              setState(() => group = null);
+              await _persistGroup(null);
+            });
+          }
 
           final ql = q.toLowerCase().trim();
           final filtered = list.where((e) {
@@ -74,13 +103,16 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
 
           return Column(
             children: [
-              // Top search + dropdown filters (kept)
               SearchFilterBar(
                 query: q,
                 onQuery: (v) => setState(() => q = v),
                 groups: allGroups,
                 selectedGroup: group,
-                onSelectGroup: (v) => setState(() => group = v),
+                onSelectGroup: (v) async {
+                  final sel = (v == null || v.isEmpty) ? null : v;
+                  setState(() => group = sel);
+                  await _persistGroup(sel);
+                },
                 hosts: allHosts,
                 selectedHost: host,
                 onSelectHost: (v) => setState(() => host = v),
@@ -90,15 +122,15 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                 sortAsc: sortAsc,
                 onToggleAsc: () => setState(() => sortAsc = !sortAsc),
               ),
-
-              // New: category buttons (chips) that filter by group
               _GroupChipsBar(
                 groups: allGroups,
                 selected: group,
-                onSelect: (g) =>
-                    setState(() => group = g?.isEmpty == true ? null : g),
+                onSelect: (g) async {
+                  final sel = (g == null || g.isEmpty) ? null : g;
+                  setState(() => group = sel);
+                  await _persistGroup(sel);
+                },
               ),
-
               const Divider(height: 1),
               Expanded(child: grid),
             ],
@@ -113,7 +145,6 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
     for (final e in list) {
       set.add((e.groupTitle ?? 'Other').trim());
     }
-    // '' = All
     return [''].followedBy(set).toList();
   }
 
@@ -159,8 +190,8 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
 }
 
 class _GroupChipsBar extends StatelessWidget {
-  final List<String> groups; // first item is '' => All
-  final String? selected; // nullable => All
+  final List<String> groups;
+  final String? selected;
   final ValueChanged<String?> onSelect;
 
   const _GroupChipsBar({
@@ -172,7 +203,6 @@ class _GroupChipsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (groups.isEmpty) return const SizedBox.shrink();
-
     return SizedBox(
       height: 48,
       child: ListView.separated(
@@ -187,7 +217,6 @@ class _GroupChipsBar extends StatelessWidget {
           final sel = (selected == null || selected!.isEmpty)
               ? isAll
               : selected == g;
-
           return ChoiceChip(
             label: Text(label, overflow: TextOverflow.ellipsis),
             selected: sel,
