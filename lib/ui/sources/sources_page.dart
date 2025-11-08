@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../viewmodels/iptv_vm.dart';
 import '../../data/iptv_models.dart';
@@ -95,9 +96,11 @@ class _SourcesPageState extends ConsumerState<SourcesPage> {
                       },
                     ).toList()
                     ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
               if (filtered.isEmpty) {
                 return const Center(child: Text('Aucune source'));
               }
+
               return RefreshIndicator(
                 onRefresh: () async {
                   for (final s in filtered) {
@@ -110,10 +113,14 @@ class _SourcesPageState extends ConsumerState<SourcesPage> {
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final s = filtered[i];
-                    final subtitle =
-                        '${s.type.toUpperCase()} • ${(s.url ?? s.server ?? '').trim()}';
+                    final rawUri = (s.url ?? s.server ?? '').trim();
+                    final subtitle = '${s.type.toUpperCase()} • $rawUri';
+
                     return Card(
                       child: ListTile(
+                        onLongPress: rawUri.isEmpty
+                            ? null
+                            : () => _copyUri(context, rawUri),
                         title: Text(
                           s.name,
                           maxLines: 1,
@@ -128,6 +135,13 @@ class _SourcesPageState extends ConsumerState<SourcesPage> {
                         trailing: Wrap(
                           spacing: 6,
                           children: [
+                            IconButton(
+                              tooltip: 'Copier l’URL',
+                              onPressed: rawUri.isEmpty
+                                  ? null
+                                  : () => _copyUri(context, rawUri),
+                              icon: const Icon(Icons.content_copy),
+                            ),
                             IconButton(
                               tooltip: 'Actualiser',
                               onPressed: isLoading
@@ -193,5 +207,13 @@ class _SourcesPageState extends ConsumerState<SourcesPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _copyUri(BuildContext context, String uri) async {
+    await Clipboard.setData(ClipboardData(text: uri));
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('URL copiée')));
   }
 }
