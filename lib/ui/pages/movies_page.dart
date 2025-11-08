@@ -6,7 +6,6 @@ import '../../../viewmodels/iptv_vm.dart';
 import 'movies/movie_details_page.dart'; // <-- page détails
 import 'movies/widgets/movie_grid.dart';
 import 'widgets/search_filter_bar.dart';
-import 'widgets/movie_grid.dart';
 
 class MoviesPage extends ConsumerStatefulWidget {
   const MoviesPage({super.key});
