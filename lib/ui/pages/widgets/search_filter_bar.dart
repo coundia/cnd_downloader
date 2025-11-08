@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
-class SearchFilterBar extends StatelessWidget {
+class SearchFilterBar extends StatefulWidget {
   final String query;
   final ValueChanged<String> onQuery;
 
@@ -12,7 +13,6 @@ class SearchFilterBar extends StatelessWidget {
   final String? selectedHost;
   final ValueChanged<String?> onSelectHost;
 
-  // Tri
   final List<String> sortKeys;
   final String selectedSortKey;
   final ValueChanged<String?> onSelectSortKey;
@@ -37,105 +37,131 @@ class SearchFilterBar extends StatelessWidget {
   });
 
   @override
+  State<SearchFilterBar> createState() => _SearchFilterBarState();
+}
+
+class _SearchFilterBarState extends State<SearchFilterBar> {
+  late final TextEditingController _ctrl;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.query);
+    _ctrl.addListener(_onControllerChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchFilterBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.query != _ctrl.text) {
+      _ctrl.text = widget.query;
+      _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _ctrl.removeListener(_onControllerChanged);
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 220), () {
+      widget.onQuery(_ctrl.text.trim());
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final queryField = Expanded(
+    final queryField = Flexible(
       flex: 2,
-      child: TextField(
-        onChanged: onQuery,
-        controller: TextEditingController(text: query),
-        decoration: const InputDecoration(
-          prefixIcon: Icon(Icons.search),
-          hintText: 'Search movies',
-          border: OutlineInputBorder(),
-          isDense: true,
+      child: SizedBox(
+        height: 40,
+        child: TextField(
+          controller: _ctrl,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (v) => widget.onQuery(v.trim()),
+          autocorrect: false,
+          enableSuggestions: false,
+          smartDashesType: SmartDashesType.disabled,
+          smartQuotesType: SmartQuotesType.disabled,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search),
+            hintText: 'Search movies',
+            border: const OutlineInputBorder(),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 8,
+            ),
+            suffixIcon: IconButton(
+              tooltip: 'Clear',
+              onPressed: () {
+                if (_ctrl.text.isEmpty) return;
+                _ctrl.clear();
+                widget.onQuery('');
+              },
+              icon: const Icon(Icons.clear),
+            ),
+          ),
         ),
       ),
     );
 
-    final groupField = Expanded(
-      child: DropdownButtonFormField<String>(
-        value: _normalizeChoice(groups, selectedGroup),
-        isDense: true,
-        items: groups
-            .map(
-              (g) => DropdownMenuItem(
-                value: g,
-                child: Text(
-                  g.isEmpty ? 'All groups' : g,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            )
-            .toList(),
-        onChanged: onSelectGroup,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: 'Group',
-          isDense: true,
-        ),
+    final groupField = Flexible(
+      child: _DropdownTight(
+        value: _normalizeChoice(widget.groups, widget.selectedGroup),
+        items: widget.groups,
+        labelWhenEmpty: 'All groups',
+        hint: 'Group',
+        onChanged: widget.onSelectGroup,
       ),
     );
 
-    final hostField = Expanded(
-      child: DropdownButtonFormField<String>(
-        value: _normalizeChoice(hosts, selectedHost),
-        isDense: true,
-        items: hosts
-            .map(
-              (h) => DropdownMenuItem(
-                value: h,
-                child: Text(
-                  h.isEmpty ? 'All hosts' : h,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            )
-            .toList(),
-        onChanged: onSelectHost,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: 'Host',
-          isDense: true,
-        ),
+    final hostField = Flexible(
+      child: _DropdownTight(
+        value: _normalizeChoice(widget.hosts, widget.selectedHost),
+        items: widget.hosts,
+        labelWhenEmpty: 'All hosts',
+        hint: 'Host',
+        onChanged: widget.onSelectHost,
       ),
     );
 
-    final sortField = Expanded(
-      child: DropdownButtonFormField<String>(
-        value: _normalizeChoice(sortKeys, selectedSortKey) ?? sortKeys.first,
-        isDense: true,
-        items: sortKeys
-            .map(
-              (k) => DropdownMenuItem(
-                value: k,
-                child: Text(k, overflow: TextOverflow.ellipsis),
-              ),
-            )
-            .toList(),
-        onChanged: onSelectSortKey,
-        decoration: const InputDecoration(
-          border: OutlineInputBorder(),
-          hintText: 'Sort by',
-          isDense: true,
-        ),
+    final sortField = Flexible(
+      child: _DropdownTight(
+        value:
+            _normalizeChoice(widget.sortKeys, widget.selectedSortKey) ??
+            widget.sortKeys.first,
+        items: widget.sortKeys,
+        labelWhenEmpty: widget.sortKeys.first,
+        hint: 'Sort by',
+        onChanged: widget.onSelectSortKey,
       ),
     );
 
     final sortOrderBtn = Tooltip(
-      message: sortAsc ? 'Ascending' : 'Descending',
+      message: widget.sortAsc ? 'Ascending' : 'Descending',
       child: InkWell(
-        onTap: onToggleAsc,
+        onTap: widget.onToggleAsc,
         borderRadius: BorderRadius.circular(8),
         child: Container(
           height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          width: 44,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             border: Border.all(color: cs.outline),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(sortAsc ? Icons.arrow_upward : Icons.arrow_downward),
+          child: Icon(
+            widget.sortAsc ? Icons.arrow_upward : Icons.arrow_downward,
+          ),
         ),
       ),
     );
@@ -146,9 +172,6 @@ class SearchFilterBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
         child: LayoutBuilder(
           builder: (c, bc) {
-            // 0..719: 2 lignes
-            // 720..999: 1 ligne compacte
-            // 1000+: 1 ligne confortable
             final narrow = bc.maxWidth < 720;
             final comfy = bc.maxWidth >= 1000;
 
@@ -165,14 +188,13 @@ class SearchFilterBar extends StatelessWidget {
                     children: [
                       sortField,
                       const SizedBox(width: 8),
-                      SizedBox(width: 48, child: Center(child: sortOrderBtn)),
+                      sortOrderBtn,
                     ],
                   ),
                 ],
               );
             }
 
-            // Large: tout sur une seule rangée
             return Row(
               children: [
                 queryField,
@@ -195,7 +217,59 @@ class SearchFilterBar extends StatelessWidget {
   String? _normalizeChoice(List<String> options, String? value) {
     if (value == null) return '';
     if (!options.contains(value)) return '';
-    return value;
-    // '' = "All ..."
+    return value; // '' = "All …"
+  }
+}
+
+/// Compact dropdown qui évite les overflows et ellipsise le texte.
+/// Utilise isExpanded: true + contentPadding réduit.
+class _DropdownTight extends StatelessWidget {
+  final String? value;
+  final List<String> items;
+  final String labelWhenEmpty;
+  final String hint;
+  final ValueChanged<String?> onChanged;
+
+  const _DropdownTight({
+    required this.value,
+    required this.items,
+    required this.labelWhenEmpty,
+    required this.hint,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: DropdownButtonFormField<String>(
+        value: value,
+        isDense: true,
+        isExpanded: true, // clé anti-overflow
+        menuMaxHeight: 360,
+        items: items
+            .map(
+              (v) => DropdownMenuItem(
+                value: v,
+                child: Text(
+                  v.isEmpty ? labelWhenEmpty : v,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            )
+            .toList(),
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          isDense: true,
+          hintText: hint,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 8,
+          ),
+        ),
+      ),
+    );
   }
 }
