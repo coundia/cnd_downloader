@@ -8,6 +8,7 @@ class CndVideoPlayer extends StatefulWidget {
   final Map<String, String>? headers;
   final bool autoPlay;
   final bool isFullscreen;
+  final Duration? startAt;
 
   const CndVideoPlayer({
     super.key,
@@ -15,6 +16,7 @@ class CndVideoPlayer extends StatefulWidget {
     this.headers,
     this.autoPlay = true,
     this.isFullscreen = false,
+    this.startAt,
   });
 
   @override
@@ -62,6 +64,9 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     _c = c;
     await c.initialize();
     if (!mounted) return;
+    if ((widget.startAt ?? Duration.zero) > Duration.zero) {
+      await c.seekTo(widget.startAt!);
+    }
     await c.setVolume(_lastVol);
     await c.setPlaybackSpeed(_speeds[_speedIx]);
     if (widget.autoPlay) await c.play();
@@ -103,13 +108,10 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   Future<void> _enterFullscreen() async {
     final c = _c;
     if (c == null) return;
-
     final wasPlaying = c.value.isPlaying;
     final pos = c.value.position;
-
     _hideT?.cancel();
     await c.pause();
-
     final key = GlobalKey<_CndVideoPlayerState>();
     final returnedPos = await Navigator.of(context).push<Duration?>(
       PageRouteBuilder(
@@ -119,19 +121,16 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
           playerKey: key,
           url: widget.url,
           headers: widget.headers,
+          startAt: pos,
           autoPlay: wasPlaying,
         ),
         transitionsBuilder: (_, a, __, child) =>
             FadeTransition(opacity: a, child: child),
       ),
     );
-
     if (!mounted) return;
-
-    // Si aucune position n’a été renvoyée, on reprend là où on s’était arrêté
     final resumeAt = returnedPos ?? pos;
     await c.seekTo(resumeAt);
-
     if (wasPlaying) {
       await c.play();
       _show = true;
@@ -193,7 +192,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         child: Center(child: CircularProgressIndicator()),
       );
     }
-
     final v = c.value;
     final dur = v.duration;
     final pos = v.position;
@@ -201,10 +199,8 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     final ratio = live
         ? 0.0
         : (dur.inMilliseconds == 0
-            ? 0.0
-            : pos.inMilliseconds /
-                dur.inMilliseconds.clamp(1, 1 << 31));
-
+              ? 0.0
+              : pos.inMilliseconds / dur.inMilliseconds.clamp(1, 1 << 31));
     final controls = FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.bottomCenter,
@@ -219,8 +215,9 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 2.5,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
                   ),
                   child: Slider(
                     value: ratio.clamp(0.0, 1.0),
@@ -311,8 +308,9 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                           : Icons.fullscreen,
                       color: Colors.white,
                     ),
-                    tooltip:
-                        widget.isFullscreen ? 'Exit full screen' : 'Full screen',
+                    tooltip: widget.isFullscreen
+                        ? 'Exit full screen'
+                        : 'Full screen',
                   ),
                 ],
               ),
@@ -321,9 +319,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         ),
       ),
     );
-
     final aspect = v.aspectRatio == 0 ? (16 / 9) : v.aspectRatio;
-
     return AspectRatio(
       aspectRatio: aspect,
       child: GestureDetector(
@@ -359,18 +355,16 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
               left: 8,
               top: 8,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   (v.duration == Duration.zero) ? 'LIVE' : 'VOD',
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: Colors.white),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: Colors.white),
                 ),
               ),
             ),
@@ -396,12 +390,14 @@ class _FullscreenVideo extends StatefulWidget {
   final GlobalKey<_CndVideoPlayerState> playerKey;
   final String url;
   final Map<String, String>? headers;
+  final Duration startAt;
   final bool autoPlay;
 
   const _FullscreenVideo({
     required this.playerKey,
     required this.url,
     required this.headers,
+    required this.startAt,
     required this.autoPlay,
   });
 
@@ -454,6 +450,7 @@ class _FullscreenVideoState extends State<_FullscreenVideo> {
               headers: widget.headers,
               autoPlay: widget.autoPlay,
               isFullscreen: true,
+              startAt: widget.startAt,
             ),
           ),
         ),

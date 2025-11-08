@@ -54,6 +54,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final vm = ref.read(settingsVmProvider.notifier);
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Settings'),
+        actions: [
+          IconButton(
+            tooltip: 'Home',
+            icon: const Icon(Icons.home),
+            onPressed: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+          ),
+        ],
+      ),
       body: AbsorbPointer(
         absorbing: _saving,
         child: ListView(
@@ -75,8 +87,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               decoration: const InputDecoration(labelText: 'Referer'),
             ),
             const SizedBox(height: 12),
-
-            // Download dir picker
             Row(
               children: [
                 Expanded(
@@ -101,10 +111,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ],
             ),
-
             const SizedBox(height: 12),
-
-            // OMDb key
             TextField(
               controller: omdbCtrl,
               obscureText: _obscureOmdb,
@@ -121,9 +128,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
             FilledButton(
               onPressed: _saving
                   ? null
@@ -169,12 +174,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               ? null
                               : omdbCtrl.text.trim(),
                         );
-
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Settings saved')),
                         );
-                        // Do NOT pop here. Avoids the black flash caused by popping during layout.
                       } finally {
                         if (mounted) setState(() => _saving = false);
                       }
