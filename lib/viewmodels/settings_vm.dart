@@ -28,14 +28,11 @@ class SettingsVm extends StateNotifier<RuntimeSettings> {
         _apply(loaded);
         return;
       } on PlatformException {
-        // réessaie sur macOS si le channel n’est pas prêt
         continue;
       } catch (_) {
-        // autre erreur: on appliquera les valeurs par défaut en fin de boucle
         break;
       }
     }
-    // fallback silencieux
     _apply(RuntimeSettings());
   }
 
@@ -49,6 +46,8 @@ class SettingsVm extends StateNotifier<RuntimeSettings> {
     settings.connectTimeoutMs = s.connectTimeoutMs;
     settings.receiveTimeoutMs = s.receiveTimeoutMs;
     settings.speedSmoothing = s.speedSmoothing;
+    settings.omdbApiKey = s.omdbApiKey; // NEW
+
     state = RuntimeSettings.from(settings);
   }
 
@@ -92,6 +91,13 @@ class SettingsVm extends StateNotifier<RuntimeSettings> {
   void setDownloadDir(String? v) {
     final nv = (v == null || v.trim().isEmpty) ? null : v.trim();
     state = state.copyWith(downloadDir: nv);
+    _apply(state);
+    _save();
+  }
+
+  void setOmdbKey(String? key) {
+    final nv = (key == null || key.trim().isEmpty) ? null : key.trim();
+    state = state.copyWith(omdbApiKey: nv);
     _apply(state);
     _save();
   }

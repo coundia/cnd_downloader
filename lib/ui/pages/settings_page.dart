@@ -19,6 +19,8 @@ class SettingsPage extends ConsumerWidget {
     final uaCtrl = TextEditingController(text: s.defaultUserAgent);
     final refCtrl = TextEditingController(text: s.defaultReferer ?? '');
     final dirCtrl = TextEditingController(text: s.downloadDir ?? '');
+    // NEW: OMDb key
+    final omdbCtrl = TextEditingController(text: s.omdbApiKey ?? '');
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -53,6 +55,16 @@ class SettingsPage extends ConsumerWidget {
             decoration: const InputDecoration(labelText: 'Referer'),
           ),
           const SizedBox(height: 12),
+          // NEW: OMDb API key
+          TextField(
+            controller: omdbCtrl,
+            decoration: const InputDecoration(
+              labelText: 'OMDb API Key',
+              helperText:
+                  'Optional. Used to fetch movie summaries/posters from omdbapi.com',
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -73,7 +85,7 @@ class SettingsPage extends ConsumerWidget {
                     dirCtrl.text = picked;
                   }
                 },
-                child: const Text('Parcourir'),
+                child: const Text('Browse'),
               ),
             ],
           ),
@@ -100,6 +112,11 @@ class SettingsPage extends ConsumerWidget {
               vm.setDownloadDir(
                 dirCtrl.text.trim().isEmpty ? null : dirCtrl.text.trim(),
               );
+              // NEW: save OMDb key
+              vm.setOmdbKey(
+                omdbCtrl.text.trim().isEmpty ? null : omdbCtrl.text.trim(),
+              );
+
               Navigator.pop(context);
             },
             child: const Text('Save'),

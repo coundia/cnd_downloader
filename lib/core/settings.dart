@@ -9,6 +9,9 @@ class RuntimeSettings {
   int receiveTimeoutMs;
   double speedSmoothing;
 
+  // NEW
+  String? omdbApiKey;
+
   RuntimeSettings({
     this.segmentsPerFile = 1,
     this.partSizeBytes = 10 * 1024 * 1024,
@@ -19,7 +22,16 @@ class RuntimeSettings {
     this.connectTimeoutMs = 10000,
     this.receiveTimeoutMs = 30000,
     this.speedSmoothing = 0.2,
+    this.omdbApiKey = '7cbf4e64',
   });
+
+  // NEW: renvoie la clé paramétrée ou celle passée en --dart-define
+  String get omdbKeyOrEnv {
+    final k = omdbApiKey?.trim();
+    if (k != null && k.isNotEmpty) return k;
+    const fromEnv = String.fromEnvironment('OMDB_API_KEY', defaultValue: '');
+    return fromEnv;
+  }
 
   RuntimeSettings copyWith({
     int? segmentsPerFile,
@@ -31,6 +43,7 @@ class RuntimeSettings {
     int? connectTimeoutMs,
     int? receiveTimeoutMs,
     double? speedSmoothing,
+    String? omdbApiKey, // NEW
   }) {
     return RuntimeSettings(
       segmentsPerFile: segmentsPerFile ?? this.segmentsPerFile,
@@ -42,10 +55,12 @@ class RuntimeSettings {
       connectTimeoutMs: connectTimeoutMs ?? this.connectTimeoutMs,
       receiveTimeoutMs: receiveTimeoutMs ?? this.receiveTimeoutMs,
       speedSmoothing: speedSmoothing ?? this.speedSmoothing,
+      omdbApiKey: omdbApiKey ?? this.omdbApiKey, // NEW
     );
   }
 
   static RuntimeSettings from(RuntimeSettings s) => s.copyWith();
 }
 
+// inchangé
 final settings = RuntimeSettings();
