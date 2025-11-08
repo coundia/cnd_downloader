@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../viewmodels/iptv_vm.dart';
 import '../../data/iptv_models.dart';
-import '../sources/sources_page.dart';
-import '../sources/source_form_page.dart';
 
 class TvPage extends ConsumerStatefulWidget {
   const TvPage({super.key});
@@ -21,36 +19,6 @@ class _TvPageState extends ConsumerState<TvPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TV'),
-        actions: [
-          IconButton(
-            tooltip: 'Sources',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SourcesPage()),
-            ),
-            icon: const Icon(Icons.playlist_play),
-          ),
-          PopupMenuButton<String>(
-            onSelected: (v) {
-              if (v == 'add') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SourceFormPage()),
-                );
-              } else if (v == 'sources') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SourcesPage()),
-                );
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'add', child: Text('Ajouter une source')),
-              PopupMenuItem(value: 'sources', child: Text('Gérer les sources')),
-            ],
-          ),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -119,14 +87,6 @@ class _TvPageState extends ConsumerState<TvPage> {
                 )
               : const SizedBox.shrink(),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SourceFormPage()),
-        ),
-        icon: const Icon(Icons.add),
-        label: const Text('Ajouter source'),
       ),
     );
   }

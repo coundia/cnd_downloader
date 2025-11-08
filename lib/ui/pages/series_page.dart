@@ -16,7 +16,6 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
     final items = ref.watch(seriesProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Series'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(

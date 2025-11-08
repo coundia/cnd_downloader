@@ -25,7 +25,6 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
     final items = ref.watch(moviesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Movies')),
       body: items.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(child: Text('Error')),

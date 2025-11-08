@@ -1,46 +1,73 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'home_page.dart';
 import 'tv_page.dart';
 import 'movies_page.dart';
 import 'series_page.dart';
 import 'settings_page.dart';
+import '../sources/sources_page.dart';
+import '../sources/source_form_page.dart';
 
-class ShellPage extends StatefulWidget {
+class ShellPage extends ConsumerStatefulWidget {
   const ShellPage({super.key});
   @override
-  State<ShellPage> createState() => _ShellPageState();
+  ConsumerState<ShellPage> createState() => _ShellPageState();
 }
 
-class _ShellPageState extends State<ShellPage> {
-  int index = 0; // TV par défaut
+class _ShellPageState extends ConsumerState<ShellPage> {
+  final bucket = PageStorageBucket();
+  int index = 0;
+
+  // Index mapping
+  static const int tvIdx = 0;
+  static const int moviesIdx = 1;
+  static const int seriesIdx = 2;
+  static const int sourcesIdx = 3; // new
+  static const int downloadsIdx = 4;
+  static const int settingsIdx = 5;
+
+  static const _titles = [
+    'TV',
+    'Movies',
+    'Series',
+    'Sources', // new
+    'Downloads',
+    'Settings',
+  ];
+
+  late final List<Widget> pages = const [
+    TvPage(key: PageStorageKey('tv')),
+    MoviesPage(key: PageStorageKey('movies')),
+    SeriesPage(key: PageStorageKey('series')),
+    SourcesPage(key: PageStorageKey('sources')), // new
+    HomePage(key: PageStorageKey('downloads')),
+    SettingsPage(key: PageStorageKey('settings')),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    // Ordre: TV, Movies, Series, Downloads, Settings
-    final pages = const [
-      TvPage(),
-      MoviesPage(),
-      SeriesPage(),
-      HomePage(),
-      SettingsPage(),
-    ];
-
-    final navItems = const [
-      NavigationDestination(icon: Icon(Icons.live_tv), label: 'TV'),
-      NavigationDestination(icon: Icon(Icons.local_movies), label: 'Movies'),
-      NavigationDestination(
-        icon: Icon(Icons.movie_creation_outlined),
-        label: 'Series',
-      ),
-      NavigationDestination(icon: Icon(Icons.download), label: 'Downloads'),
-      NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
-    ];
-
     return LayoutBuilder(
       builder: (c, bc) {
         final wide = bc.maxWidth >= 900;
+
+        final actions = <Widget>[
+          if (index == sourcesIdx)
+            IconButton(
+              tooltip: 'Add source',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SourceFormPage()),
+                );
+              },
+              icon: const Icon(Icons.add_circle),
+            ),
+        ];
+
         if (wide) {
           return Scaffold(
+            appBar: AppBar(title: Text(_titles[index]), actions: actions),
             body: Row(
               children: [
                 NavigationRail(
@@ -61,6 +88,11 @@ class _ShellPageState extends State<ShellPage> {
                       label: Text('Series'),
                     ),
                     NavigationRailDestination(
+                      // new
+                      icon: Icon(Icons.playlist_play),
+                      label: Text('Sources'),
+                    ),
+                    NavigationRailDestination(
                       icon: Icon(Icons.download),
                       label: Text('Downloads'),
                     ),
@@ -71,18 +103,50 @@ class _ShellPageState extends State<ShellPage> {
                   ],
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: pages[index]),
+                Expanded(
+                  child: PageStorage(
+                    bucket: bucket,
+                    child: IndexedStack(index: index, children: pages),
+                  ),
+                ),
               ],
             ),
           );
         }
 
         return Scaffold(
-          body: pages[index],
+          appBar: AppBar(title: Text(_titles[index]), actions: actions),
+          body: PageStorage(
+            bucket: bucket,
+            child: IndexedStack(index: index, children: pages),
+          ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: index,
-            destinations: navItems,
             onDestinationSelected: (v) => setState(() => index = v),
+            destinations: const [
+              NavigationDestination(icon: Icon(Icons.live_tv), label: 'TV'),
+              NavigationDestination(
+                icon: Icon(Icons.local_movies),
+                label: 'Movies',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.movie_creation_outlined),
+                label: 'Series',
+              ),
+              NavigationDestination(
+                // new
+                icon: Icon(Icons.playlist_play),
+                label: 'Sources',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.download),
+                label: 'Downloads',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.settings),
+                label: 'Settings',
+              ),
+            ],
           ),
         );
       },

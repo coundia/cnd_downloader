@@ -46,7 +46,6 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CND Downloader'),
         actions: [
           IconButton(
             tooltip: 'Paramètres',

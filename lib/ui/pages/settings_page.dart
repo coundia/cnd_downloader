@@ -54,7 +54,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final vm = ref.read(settingsVmProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
       body: AbsorbPointer(
         absorbing: _saving,
         child: ListView(
