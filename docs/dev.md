@@ -1,0 +1,1 @@
+flutter pub add video_player_media_kit
