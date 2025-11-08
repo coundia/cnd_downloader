@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../../../data/iptv_models.dart';
-import 'movie_details_pane.dart';
 
 class MovieGrid extends StatelessWidget {
   final List<IptvItem> items;
   final IptvItem? selected;
   final ValueChanged<IptvItem> onSelect;
+
+  /// Must change when query/filter/sort changes to force a clean grid rebuild.
+  final String identity;
+
   const MovieGrid({
     super.key,
     required this.items,
     required this.selected,
     required this.onSelect,
+    required this.identity,
   });
 
   @override
@@ -30,7 +34,8 @@ class MovieGrid extends StatelessWidget {
             ? 4
             : 3;
 
-        return GridView.custom(
+        return GridView.builder(
+          key: ValueKey(identity), // reset list safely when filters change
           padding: const EdgeInsets.all(12),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: cross,
@@ -38,51 +43,36 @@ class MovieGrid extends StatelessWidget {
             crossAxisSpacing: 10,
             childAspectRatio: .68,
           ),
-          childrenDelegate: SliverChildBuilderDelegate(
-            (ctx, i) {
-              final it = items[i];
-              final isSel = selected?.streamUrl == it.streamUrl;
-              return _Poster(
-                key: ValueKey(it.streamUrl),
-                item: it,
-                selected: isSel,
-                onTap: () {
-                  final wide = MediaQuery.of(ctx).size.width >= 1100;
-                  if (wide) {
-                    onSelect(it);
-                  } else {
-                    showModalBottomSheet(
-                      context: ctx,
-                      showDragHandle: true,
-                      isScrollControlled: true,
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.of(ctx).size.height * 0.95,
-                      ),
-                      builder: (_) => MovieDetailsPane(item: it),
-                    );
-                  }
-                },
-              );
-            },
-            childCount: items.length,
-            addAutomaticKeepAlives: false,
-            addRepaintBoundaries: true,
-            findChildIndexCallback: (Key key) {
-              final k = key as ValueKey<String>;
-              return items.indexWhere((e) => e.streamUrl == k.value);
-            },
-          ),
+          itemCount: items.length,
+          itemBuilder: (_, i) {
+            final item = items[i];
+            // Stable unique key derived from content, not from index.
+            final cellKey = ValueKey('${item.streamUrl}::${item.name}');
+            final isSelected =
+                selected != null &&
+                (identical(item, selected) ||
+                    (item.name == selected!.name &&
+                        item.streamUrl == selected!.streamUrl));
+
+            return _PosterCard(
+              key: cellKey,
+              item: item,
+              selected: isSelected,
+              onTap: () => onSelect(item),
+            );
+          },
         );
       },
     );
   }
 }
 
-class _Poster extends StatelessWidget {
+class _PosterCard extends StatelessWidget {
   final IptvItem item;
   final bool selected;
   final VoidCallback onTap;
-  const _Poster({
+
+  const _PosterCard({
     super.key,
     required this.item,
     required this.selected,
@@ -92,6 +82,7 @@ class _Poster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -101,12 +92,15 @@ class _Poster extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Column(
+          mainAxisSize: MainAxisSize.max,
           children: [
+            // Fill available vertical space to avoid overflow during relayouts
             Expanded(
               child: (item.logo ?? '').isNotEmpty
                   ? Image.network(
                       item.logo!,
                       fit: BoxFit.cover,
+                      gaplessPlayback: true,
                       errorBuilder: (_, __, ___) =>
                           const ColoredBox(color: Color(0xFFECECEC)),
                     )
@@ -137,6 +131,7 @@ class _Poster extends StatelessWidget {
 class _Chip extends StatelessWidget {
   final String text;
   const _Chip({required this.text});
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

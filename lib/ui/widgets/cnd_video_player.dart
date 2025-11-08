@@ -44,7 +44,8 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   Future<void> _open() async {
     final c = VideoPlayerController.networkUrl(
       Uri.parse(widget.url),
-      // httpHeaders: widget.headers,
+      // certains forks exigent un Map non-nullable
+      httpHeaders: widget.headers ?? const <String, String>{},
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
     _c = c;
@@ -81,79 +82,119 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     final pos = c.value.position;
     final ratio = dur.inMilliseconds == 0
         ? 0.0
-        : pos.inMilliseconds / dur.inMilliseconds.clamp(1, 1 << 31);
+        : pos.inMilliseconds /
+              dur.inMilliseconds.clamp(1, 1 << 31); // évite div/0 sur web
 
-    final row1 = Row(
+    final timelineRow = Row(
       children: [
         IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          iconSize: 22,
           onPressed: () => c.value.isPlaying ? c.pause() : c.play(),
-          icon: Icon(c.value.isPlaying ? Icons.pause : Icons.play_arrow),
+          icon: Icon(
+            c.value.isPlaying ? Icons.pause : Icons.play_arrow,
+            color: Colors.white,
+          ),
+          tooltip: c.value.isPlaying ? 'Pause' : 'Play',
         ),
-        IconButton(
-          onPressed: () => c.seekTo(pos - const Duration(seconds: 10)),
-          icon: const Icon(Icons.replay_10),
-        ),
-        IconButton(
-          onPressed: () => c.seekTo(pos + const Duration(seconds: 10)),
-          icon: const Icon(Icons.forward_10),
-        ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(
-          child: Slider(
-            value: ratio.clamp(0.0, 1.0),
-            onChanged: (v) {
-              final ms = (dur.inMilliseconds * v).toInt();
-              c.seekTo(Duration(milliseconds: ms));
-            },
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 2.5,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            ),
+            child: Slider(
+              value: ratio.clamp(0.0, 1.0),
+              onChanged: (v) {
+                final ms = (dur.inMilliseconds * v).toInt();
+                c.seekTo(Duration(milliseconds: ms));
+              },
+              activeColor: Colors.white,
+              inactiveColor: Colors.white24,
+            ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Text(
           '${_fmt(pos)} / ${_fmt(dur)}',
-          style: Theme.of(context).textTheme.labelSmall,
+          style: const TextStyle(color: Colors.white, fontSize: 12),
         ),
       ],
     );
 
-    return Column(
+    final jumpRow = Row(
       children: [
-        AspectRatio(
-          aspectRatio: c.value.aspectRatio == 0
-              ? (16 / 9)
-              : c.value.aspectRatio,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              VideoPlayer(c),
-              Positioned(
-                left: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    'LIVE',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          iconSize: 20,
+          onPressed: () => c.seekTo(pos - const Duration(seconds: 10)),
+          icon: const Icon(Icons.replay_10, color: Colors.white),
+          tooltip: 'Back 10s',
         ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: row1,
+        const SizedBox(width: 8),
+        IconButton(
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+          iconSize: 20,
+          onPressed: () => c.seekTo(pos + const Duration(seconds: 10)),
+          icon: const Icon(Icons.forward_10, color: Colors.white),
+          tooltip: 'Forward 10s',
         ),
       ],
+    );
+
+    // Empêche tout overflow : mise à l’échelle automatique si l’espace est trop petit.
+    final controls = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 900),
+        child: Material(
+          color: Colors.black.withOpacity(0.35),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [timelineRow, jumpRow],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final aspect = c.value.aspectRatio == 0 ? (16 / 9) : c.value.aspectRatio;
+
+    // Ne PAS emballer ce widget dans un autre AspectRatio.
+    return AspectRatio(
+      aspectRatio: aspect,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          VideoPlayer(c),
+          Positioned(
+            left: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'LIVE',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: Colors.white),
+              ),
+            ),
+          ),
+          Positioned(left: 8, right: 8, bottom: 8, child: controls),
+        ],
+      ),
     );
   }
 }

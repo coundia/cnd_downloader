@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/iptv_models.dart';
 import '../../../viewmodels/iptv_vm.dart';
-import 'movies/movie_details_page.dart'; // <-- page détails
+import 'movies/movie_details_page.dart';
 import 'movies/widgets/movie_grid.dart';
 import 'widgets/search_filter_bar.dart';
 
@@ -33,25 +33,22 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
           final allGroups = _uniqueGroups(list);
           final allHosts = _uniqueHosts(list);
 
+          final ql = q.toLowerCase().trim();
           final filtered = list.where((e) {
             final hitQuery =
-                q.isEmpty ||
-                ('${e.name} ${e.groupTitle ?? ''}').toLowerCase().contains(
-                  q.toLowerCase(),
-                );
+                ql.isEmpty ||
+                ('${e.name} ${e.groupTitle ?? ''}').toLowerCase().contains(ql);
             final hitGroup =
-                group == null ||
-                group!.isEmpty ||
+                (group == null || group!.isEmpty) ||
                 (e.groupTitle ?? 'Other') == group;
             final h = _safeHost(e.streamUrl);
-            final hitHost = host == null || host!.isEmpty || h == host;
+            final hitHost = (host == null || host!.isEmpty) || h == host;
             return hitQuery && hitGroup && hitHost;
           }).toList();
 
           _sortInPlace(filtered, sortKey, sortAsc);
 
           void onPick(IptvItem it) {
-            // évite push durant update de device/gesture
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;
               Navigator.of(context).push(
@@ -60,10 +57,20 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
             });
           }
 
+          final identity = [
+            q,
+            group ?? '',
+            host ?? '',
+            sortKey,
+            sortAsc ? 'asc' : 'desc',
+            filtered.length.toString(),
+          ].join('|');
+
           final grid = MovieGrid(
             items: filtered,
             selected: null,
             onSelect: onPick,
+            identity: identity,
           );
 
           return Column(
