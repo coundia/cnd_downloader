@@ -68,7 +68,6 @@ class MovieDetailsPane extends ConsumerWidget {
                 url: item.streamUrl,
                 headers: headers,
                 autoPlay: true,
-                aspectRatio: 16 / 9,
               ),
               const SizedBox(height: 12),
               Align(

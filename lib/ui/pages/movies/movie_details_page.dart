@@ -272,12 +272,7 @@ class MoviePlayerPage extends StatelessWidget {
           aspectRatio: 16 / 9,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: CndVideoPlayer(
-              url: url,
-              headers: headers,
-              autoPlay: true,
-              aspectRatio: 16 / 9,
-            ),
+            child: CndVideoPlayer(url: url, headers: headers, autoPlay: true),
           ),
         ),
       ),
