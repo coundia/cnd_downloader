@@ -1,13 +1,14 @@
 import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../viewmodels/iptv_vm.dart';
 import '../../../data/iptv_models.dart';
+import '../../../viewmodels/iptv_vm.dart';
+import 'movies/movie_details_page.dart';
 import 'movies/widgets/movie_details_pane.dart';
 import 'movies/widgets/movie_grid.dart';
+import 'widgets/search_filter_bar.dart';
 import 'widgets/movie_grid.dart';
 import 'widgets/movie_details_pane.dart';
-import 'widgets/search_filter_bar.dart';
 
 class MoviesPage extends ConsumerStatefulWidget {
   const MoviesPage({super.key});
@@ -19,12 +20,8 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
   String q = '';
   String? group;
   String? host;
-
-  // Tri
-  static const _sortKeys = <String>['Name', 'Group', 'Host'];
-  String sortKey = _sortKeys.first;
+  String sortKey = 'Name';
   bool sortAsc = true;
-
   IptvItem? selected;
 
   @override
@@ -39,47 +36,22 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
           final allGroups = _uniqueGroups(list);
           final allHosts = _uniqueHosts(list);
 
-          // Filtre
           final filtered = list.where((e) {
-            final mQuery =
+            final hitQuery =
                 q.isEmpty ||
                 ('${e.name} ${e.groupTitle ?? ''}').toLowerCase().contains(
                   q.toLowerCase(),
                 );
-            final mGroup =
+            final hitGroup =
                 group == null ||
                 group!.isEmpty ||
                 (e.groupTitle ?? 'Other') == group;
             final h = _safeHost(e.streamUrl);
-            final mHost = host == null || host!.isEmpty || h == host;
-            return mQuery && mGroup && mHost;
+            final hitHost = host == null || host!.isEmpty || h == host;
+            return hitQuery && hitGroup && hitHost;
           }).toList();
 
-          // Tri
-          filtered.sort((a, b) {
-            int res;
-            switch (sortKey) {
-              case 'Group':
-                res = (a.groupTitle ?? 'Other').toLowerCase().compareTo(
-                  (b.groupTitle ?? 'Other').toLowerCase(),
-                );
-                break;
-              case 'Host':
-                res = _safeHost(
-                  a.streamUrl,
-                ).toLowerCase().compareTo(_safeHost(b.streamUrl).toLowerCase());
-                break;
-              case 'Name':
-              default:
-                res = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-                break;
-            }
-            if (res == 0) {
-              // Dénominateur commun pour stabilité
-              res = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-            }
-            return sortAsc ? res : -res;
-          });
+          _sortInPlace(filtered, sortKey, sortAsc);
 
           if (filtered.isEmpty) {
             return Column(
@@ -93,13 +65,9 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                   hosts: allHosts,
                   selectedHost: host,
                   onSelectHost: (v) => setState(() => host = v),
-                  sortKeys: _sortKeys,
+                  sortKeys: const ['Name', 'Group', 'Host'],
                   selectedSortKey: sortKey,
-                  onSelectSortKey: (v) => setState(
-                    () => sortKey = (v == null || v.isEmpty)
-                        ? _sortKeys.first
-                        : v,
-                  ),
+                  onSelectSortKey: (v) => setState(() => sortKey = v ?? 'Name'),
                   sortAsc: sortAsc,
                   onToggleAsc: () => setState(() => sortAsc = !sortAsc),
                 ),
@@ -112,16 +80,27 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
           return LayoutBuilder(
             builder: (c, bc) {
               final wide = bc.maxWidth >= 1100;
-              final detailsW = _clampDouble(bc.maxWidth * 0.34, 320, 480);
+              final detailsW = _clamp(bc.maxWidth * 0.34, 320, 480);
+
+              void onPick(IptvItem it) {
+                if (wide) {
+                  setState(() => selected = it);
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MovieDetailsPage(item: it),
+                    ),
+                  );
+                }
+              }
 
               final grid = MovieGrid(
                 items: filtered,
                 selected: selected,
-                onSelect: (it) => setState(() => selected = it),
+                onSelect: onPick,
               );
 
               if (!wide) {
-                // Stack mobile: barre en haut, grille en dessous
                 return Column(
                   children: [
                     SearchFilterBar(
@@ -133,13 +112,10 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                       hosts: allHosts,
                       selectedHost: host,
                       onSelectHost: (v) => setState(() => host = v),
-                      sortKeys: _sortKeys,
+                      sortKeys: const ['Name', 'Group', 'Host'],
                       selectedSortKey: sortKey,
-                      onSelectSortKey: (v) => setState(
-                        () => sortKey = (v == null || v.isEmpty)
-                            ? _sortKeys.first
-                            : v,
-                      ),
+                      onSelectSortKey: (v) =>
+                          setState(() => sortKey = v ?? 'Name'),
                       sortAsc: sortAsc,
                       onToggleAsc: () => setState(() => sortAsc = !sortAsc),
                     ),
@@ -149,7 +125,6 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                 );
               }
 
-              // Large: grille à gauche, panneau détails à droite
               final sel = selected ?? filtered.first;
               return Row(
                 children: [
@@ -166,13 +141,10 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                           hosts: allHosts,
                           selectedHost: host,
                           onSelectHost: (v) => setState(() => host = v),
-                          sortKeys: _sortKeys,
+                          sortKeys: const ['Name', 'Group', 'Host'],
                           selectedSortKey: sortKey,
-                          onSelectSortKey: (v) => setState(
-                            () => sortKey = (v == null || v.isEmpty)
-                                ? _sortKeys.first
-                                : v,
-                          ),
+                          onSelectSortKey: (v) =>
+                              setState(() => sortKey = v ?? 'Name'),
                           sortAsc: sortAsc,
                           onToggleAsc: () => setState(() => sortAsc = !sortAsc),
                         ),
@@ -220,7 +192,30 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
     }
   }
 
-  double _clampDouble(double v, double min, double max) {
+  void _sortInPlace(List<IptvItem> list, String key, bool asc) {
+    int cmp(IptvItem a, IptvItem b) {
+      int r;
+      switch (key) {
+        case 'Group':
+          r = (a.groupTitle ?? 'Other').toLowerCase().compareTo(
+            (b.groupTitle ?? 'Other').toLowerCase(),
+          );
+          break;
+        case 'Host':
+          r = _safeHost(
+            a.streamUrl,
+          ).toLowerCase().compareTo(_safeHost(b.streamUrl).toLowerCase());
+          break;
+        default:
+          r = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      }
+      return asc ? r : -r;
+    }
+
+    list.sort(cmp);
+  }
+
+  double _clamp(double v, double min, double max) {
     if (v < min) return min;
     if (v > max) return max;
     return v;

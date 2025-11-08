@@ -3,16 +3,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/paths.dart';
+import '../../../../core/settings.dart';
 import '../../../../viewmodels/download_list_vm.dart';
 import '../../../../data/iptv_models.dart';
+import '../../../widgets/cnd_video_player.dart';
 
 class MovieDetailsPane extends ConsumerWidget {
   final IptvItem item;
   const MovieDetailsPane({super.key, required this.item});
 
+  Map<String, String> _headers() {
+    final h = <String, String>{};
+    if ((settings.defaultUserAgent).trim().isNotEmpty) {
+      h['user-agent'] = settings.defaultUserAgent;
+    }
+    if ((settings.defaultReferer ?? '').trim().isNotEmpty) {
+      h['referer'] = settings.defaultReferer!.trim();
+    }
+    return h;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final headers = _headers();
 
     return Material(
       color: theme.colorScheme.surface,
@@ -50,16 +64,11 @@ class MovieDetailsPane extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              AspectRatio(
+              CndVideoPlayer(
+                url: item.streamUrl,
+                headers: headers,
+                autoPlay: true,
                 aspectRatio: 16 / 9,
-                child: (item.logo ?? '').isNotEmpty
-                    ? Image.network(
-                        item.logo!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const ColoredBox(color: Color(0xFF111111)),
-                      )
-                    : const ColoredBox(color: Color(0xFF111111)),
               ),
               const SizedBox(height: 12),
               Align(
@@ -121,7 +130,7 @@ class _ActionsBar extends ConsumerWidget {
           child: FilledButton.icon(
             onPressed: () => _openUrlExternally(streamUrl, context),
             icon: const Icon(Icons.play_arrow),
-            label: const Text('Watch'),
+            label: const Text('Watch in app'),
           ),
         );
 
