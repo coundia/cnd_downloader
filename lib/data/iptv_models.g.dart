@@ -32,28 +32,38 @@ const IptvSourceSchema = CollectionSchema(
       name: r'password',
       type: IsarType.string,
     ),
-    r'server': PropertySchema(
+    r'provider': PropertySchema(
       id: 3,
+      name: r'provider',
+      type: IsarType.string,
+    ),
+    r'server': PropertySchema(
+      id: 4,
       name: r'server',
       type: IsarType.string,
     ),
     r'type': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'type',
       type: IsarType.string,
     ),
     r'updatedAt': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
     r'url': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'url',
       type: IsarType.string,
     ),
+    r'urlTvg': PropertySchema(
+      id: 8,
+      name: r'urlTvg',
+      type: IsarType.string,
+    ),
     r'username': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'username',
       type: IsarType.string,
     )
@@ -86,6 +96,12 @@ int _iptvSourceEstimateSize(
     }
   }
   {
+    final value = object.provider;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.server;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -94,6 +110,12 @@ int _iptvSourceEstimateSize(
   bytesCount += 3 + object.type.length * 3;
   {
     final value = object.url;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.urlTvg;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -116,11 +138,13 @@ void _iptvSourceSerialize(
   writer.writeDateTime(offsets[0], object.createdAt);
   writer.writeString(offsets[1], object.name);
   writer.writeString(offsets[2], object.password);
-  writer.writeString(offsets[3], object.server);
-  writer.writeString(offsets[4], object.type);
-  writer.writeDateTime(offsets[5], object.updatedAt);
-  writer.writeString(offsets[6], object.url);
-  writer.writeString(offsets[7], object.username);
+  writer.writeString(offsets[3], object.provider);
+  writer.writeString(offsets[4], object.server);
+  writer.writeString(offsets[5], object.type);
+  writer.writeDateTime(offsets[6], object.updatedAt);
+  writer.writeString(offsets[7], object.url);
+  writer.writeString(offsets[8], object.urlTvg);
+  writer.writeString(offsets[9], object.username);
 }
 
 IptvSource _iptvSourceDeserialize(
@@ -134,11 +158,13 @@ IptvSource _iptvSourceDeserialize(
   object.id = id;
   object.name = reader.readString(offsets[1]);
   object.password = reader.readStringOrNull(offsets[2]);
-  object.server = reader.readStringOrNull(offsets[3]);
-  object.type = reader.readString(offsets[4]);
-  object.updatedAt = reader.readDateTime(offsets[5]);
-  object.url = reader.readStringOrNull(offsets[6]);
-  object.username = reader.readStringOrNull(offsets[7]);
+  object.provider = reader.readStringOrNull(offsets[3]);
+  object.server = reader.readStringOrNull(offsets[4]);
+  object.type = reader.readString(offsets[5]);
+  object.updatedAt = reader.readDateTime(offsets[6]);
+  object.url = reader.readStringOrNull(offsets[7]);
+  object.urlTvg = reader.readStringOrNull(offsets[8]);
+  object.username = reader.readStringOrNull(offsets[9]);
   return object;
 }
 
@@ -158,12 +184,16 @@ P _iptvSourceDeserializeProp<P>(
     case 3:
       return (reader.readStringOrNull(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
-    case 5:
-      return (reader.readDateTime(offset)) as P;
-    case 6:
       return (reader.readStringOrNull(offset)) as P;
+    case 5:
+      return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readDateTime(offset)) as P;
     case 7:
+      return (reader.readStringOrNull(offset)) as P;
+    case 8:
+      return (reader.readStringOrNull(offset)) as P;
+    case 9:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -649,6 +679,157 @@ extension IptvSourceQueryFilter
     });
   }
 
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> providerIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'provider',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition>
+      providerIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'provider',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> providerEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'provider',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition>
+      providerGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'provider',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> providerLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'provider',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> providerBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'provider',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition>
+      providerStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'provider',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> providerEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'provider',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> providerContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'provider',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> providerMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'provider',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition>
+      providerIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'provider',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition>
+      providerIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'provider',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> serverIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1127,6 +1308,154 @@ extension IptvSourceQueryFilter
     });
   }
 
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'urlTvg',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition>
+      urlTvgIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'urlTvg',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'urlTvg',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'urlTvg',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'urlTvg',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'urlTvg',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'urlTvg',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'urlTvg',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'urlTvg',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'urlTvg',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> urlTvgIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'urlTvg',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition>
+      urlTvgIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'urlTvg',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<IptvSource, IptvSource, QAfterFilterCondition> usernameIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1323,6 +1652,18 @@ extension IptvSourceQuerySortBy
     });
   }
 
+  QueryBuilder<IptvSource, IptvSource, QAfterSortBy> sortByProvider() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'provider', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterSortBy> sortByProviderDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'provider', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvSource, IptvSource, QAfterSortBy> sortByServer() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'server', Sort.asc);
@@ -1368,6 +1709,18 @@ extension IptvSourceQuerySortBy
   QueryBuilder<IptvSource, IptvSource, QAfterSortBy> sortByUrlDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'url', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterSortBy> sortByUrlTvg() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'urlTvg', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterSortBy> sortByUrlTvgDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'urlTvg', Sort.desc);
     });
   }
 
@@ -1434,6 +1787,18 @@ extension IptvSourceQuerySortThenBy
     });
   }
 
+  QueryBuilder<IptvSource, IptvSource, QAfterSortBy> thenByProvider() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'provider', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterSortBy> thenByProviderDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'provider', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvSource, IptvSource, QAfterSortBy> thenByServer() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'server', Sort.asc);
@@ -1482,6 +1847,18 @@ extension IptvSourceQuerySortThenBy
     });
   }
 
+  QueryBuilder<IptvSource, IptvSource, QAfterSortBy> thenByUrlTvg() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'urlTvg', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QAfterSortBy> thenByUrlTvgDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'urlTvg', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvSource, IptvSource, QAfterSortBy> thenByUsername() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'username', Sort.asc);
@@ -1517,6 +1894,13 @@ extension IptvSourceQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IptvSource, IptvSource, QDistinct> distinctByProvider(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'provider', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<IptvSource, IptvSource, QDistinct> distinctByServer(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1541,6 +1925,13 @@ extension IptvSourceQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'url', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvSource, IptvSource, QDistinct> distinctByUrlTvg(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'urlTvg', caseSensitive: caseSensitive);
     });
   }
 
@@ -1578,6 +1969,12 @@ extension IptvSourceQueryProperty
     });
   }
 
+  QueryBuilder<IptvSource, String?, QQueryOperations> providerProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'provider');
+    });
+  }
+
   QueryBuilder<IptvSource, String?, QQueryOperations> serverProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'server');
@@ -1602,6 +1999,12 @@ extension IptvSourceQueryProperty
     });
   }
 
+  QueryBuilder<IptvSource, String?, QQueryOperations> urlTvgProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'urlTvg');
+    });
+  }
+
   QueryBuilder<IptvSource, String?, QQueryOperations> usernameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'username');
@@ -1620,45 +2023,150 @@ const IptvItemSchema = CollectionSchema(
   name: r'IptvItem',
   id: 8947210026857314837,
   properties: {
-    r'createdAt': PropertySchema(
+    r'catchup': PropertySchema(
       id: 0,
+      name: r'catchup',
+      type: IsarType.string,
+    ),
+    r'catchupDays': PropertySchema(
+      id: 1,
+      name: r'catchupDays',
+      type: IsarType.long,
+    ),
+    r'catchupSource': PropertySchema(
+      id: 2,
+      name: r'catchupSource',
+      type: IsarType.string,
+    ),
+    r'chno': PropertySchema(
+      id: 3,
+      name: r'chno',
+      type: IsarType.long,
+    ),
+    r'country': PropertySchema(
+      id: 4,
+      name: r'country',
+      type: IsarType.string,
+    ),
+    r'createdAt': PropertySchema(
+      id: 5,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
+    r'epgShift': PropertySchema(
+      id: 6,
+      name: r'epgShift',
+      type: IsarType.string,
+    ),
+    r'ext': PropertySchema(
+      id: 7,
+      name: r'ext',
+      type: IsarType.string,
+    ),
     r'groupTitle': PropertySchema(
-      id: 1,
+      id: 8,
       name: r'groupTitle',
       type: IsarType.string,
     ),
+    r'headersJson': PropertySchema(
+      id: 9,
+      name: r'headersJson',
+      type: IsarType.string,
+    ),
+    r'host': PropertySchema(
+      id: 10,
+      name: r'host',
+      type: IsarType.string,
+    ),
+    r'imdbDescription': PropertySchema(
+      id: 11,
+      name: r'imdbDescription',
+      type: IsarType.string,
+    ),
+    r'imdbId': PropertySchema(
+      id: 12,
+      name: r'imdbId',
+      type: IsarType.string,
+    ),
+    r'imdbRating': PropertySchema(
+      id: 13,
+      name: r'imdbRating',
+      type: IsarType.double,
+    ),
     r'kind': PropertySchema(
-      id: 2,
+      id: 14,
       name: r'kind',
       type: IsarType.string,
     ),
+    r'language': PropertySchema(
+      id: 15,
+      name: r'language',
+      type: IsarType.string,
+    ),
     r'logo': PropertySchema(
-      id: 3,
+      id: 16,
       name: r'logo',
       type: IsarType.string,
     ),
     r'name': PropertySchema(
-      id: 4,
+      id: 17,
       name: r'name',
       type: IsarType.string,
     ),
+    r'nameOriginal': PropertySchema(
+      id: 18,
+      name: r'nameOriginal',
+      type: IsarType.string,
+    ),
+    r'path': PropertySchema(
+      id: 19,
+      name: r'path',
+      type: IsarType.string,
+    ),
+    r'realUrl': PropertySchema(
+      id: 20,
+      name: r'realUrl',
+      type: IsarType.string,
+    ),
+    r'referer': PropertySchema(
+      id: 21,
+      name: r'referer',
+      type: IsarType.string,
+    ),
+    r'scheme': PropertySchema(
+      id: 22,
+      name: r'scheme',
+      type: IsarType.string,
+    ),
     r'sourceId': PropertySchema(
-      id: 5,
+      id: 23,
       name: r'sourceId',
       type: IsarType.long,
     ),
     r'streamUrl': PropertySchema(
-      id: 6,
+      id: 24,
       name: r'streamUrl',
       type: IsarType.string,
     ),
+    r'tvgId': PropertySchema(
+      id: 25,
+      name: r'tvgId',
+      type: IsarType.string,
+    ),
+    r'tvgName': PropertySchema(
+      id: 26,
+      name: r'tvgName',
+      type: IsarType.string,
+    ),
     r'updatedAt': PropertySchema(
-      id: 7,
+      id: 27,
       name: r'updatedAt',
       type: IsarType.dateTime,
+    ),
+    r'userAgent': PropertySchema(
+      id: 28,
+      name: r'userAgent',
+      type: IsarType.string,
     )
   },
   estimateSize: _iptvItemEstimateSize,
@@ -1666,7 +2174,73 @@ const IptvItemSchema = CollectionSchema(
   deserialize: _iptvItemDeserialize,
   deserializeProp: _iptvItemDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'sourceId': IndexSchema(
+      id: 2155220942429093580,
+      name: r'sourceId',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'sourceId',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'kind': IndexSchema(
+      id: 1484550194077596484,
+      name: r'kind',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'kind',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
+    ),
+    r'name': IndexSchema(
+      id: 879695947855722453,
+      name: r'name',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'name',
+          type: IndexType.hash,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'host': IndexSchema(
+      id: -7602099240340412494,
+      name: r'host',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'host',
+          type: IndexType.hash,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'imdbId': IndexSchema(
+      id: 2396777269980646654,
+      name: r'imdbId',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'imdbId',
+          type: IndexType.hash,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {},
   embeddedSchemas: {},
   getId: _iptvItemGetId,
@@ -1682,12 +2256,67 @@ int _iptvItemEstimateSize(
 ) {
   var bytesCount = offsets.last;
   {
+    final value = object.catchup;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.catchupSource;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.country;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.epgShift;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.ext;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.groupTitle;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.headersJson;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  bytesCount += 3 + object.host.length * 3;
+  {
+    final value = object.imdbDescription;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.imdbId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.kind.length * 3;
+  {
+    final value = object.language;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   {
     final value = object.logo;
     if (value != null) {
@@ -1695,7 +2324,55 @@ int _iptvItemEstimateSize(
     }
   }
   bytesCount += 3 + object.name.length * 3;
+  {
+    final value = object.nameOriginal;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.path;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.realUrl;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.referer;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.scheme;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.streamUrl.length * 3;
+  {
+    final value = object.tvgId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.tvgName;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.userAgent;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -1705,14 +2382,35 @@ void _iptvItemSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeDateTime(offsets[0], object.createdAt);
-  writer.writeString(offsets[1], object.groupTitle);
-  writer.writeString(offsets[2], object.kind);
-  writer.writeString(offsets[3], object.logo);
-  writer.writeString(offsets[4], object.name);
-  writer.writeLong(offsets[5], object.sourceId);
-  writer.writeString(offsets[6], object.streamUrl);
-  writer.writeDateTime(offsets[7], object.updatedAt);
+  writer.writeString(offsets[0], object.catchup);
+  writer.writeLong(offsets[1], object.catchupDays);
+  writer.writeString(offsets[2], object.catchupSource);
+  writer.writeLong(offsets[3], object.chno);
+  writer.writeString(offsets[4], object.country);
+  writer.writeDateTime(offsets[5], object.createdAt);
+  writer.writeString(offsets[6], object.epgShift);
+  writer.writeString(offsets[7], object.ext);
+  writer.writeString(offsets[8], object.groupTitle);
+  writer.writeString(offsets[9], object.headersJson);
+  writer.writeString(offsets[10], object.host);
+  writer.writeString(offsets[11], object.imdbDescription);
+  writer.writeString(offsets[12], object.imdbId);
+  writer.writeDouble(offsets[13], object.imdbRating);
+  writer.writeString(offsets[14], object.kind);
+  writer.writeString(offsets[15], object.language);
+  writer.writeString(offsets[16], object.logo);
+  writer.writeString(offsets[17], object.name);
+  writer.writeString(offsets[18], object.nameOriginal);
+  writer.writeString(offsets[19], object.path);
+  writer.writeString(offsets[20], object.realUrl);
+  writer.writeString(offsets[21], object.referer);
+  writer.writeString(offsets[22], object.scheme);
+  writer.writeLong(offsets[23], object.sourceId);
+  writer.writeString(offsets[24], object.streamUrl);
+  writer.writeString(offsets[25], object.tvgId);
+  writer.writeString(offsets[26], object.tvgName);
+  writer.writeDateTime(offsets[27], object.updatedAt);
+  writer.writeString(offsets[28], object.userAgent);
 }
 
 IptvItem _iptvItemDeserialize(
@@ -1722,15 +2420,36 @@ IptvItem _iptvItemDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = IptvItem();
-  object.createdAt = reader.readDateTime(offsets[0]);
-  object.groupTitle = reader.readStringOrNull(offsets[1]);
+  object.catchup = reader.readStringOrNull(offsets[0]);
+  object.catchupDays = reader.readLongOrNull(offsets[1]);
+  object.catchupSource = reader.readStringOrNull(offsets[2]);
+  object.chno = reader.readLongOrNull(offsets[3]);
+  object.country = reader.readStringOrNull(offsets[4]);
+  object.createdAt = reader.readDateTime(offsets[5]);
+  object.epgShift = reader.readStringOrNull(offsets[6]);
+  object.ext = reader.readStringOrNull(offsets[7]);
+  object.groupTitle = reader.readStringOrNull(offsets[8]);
+  object.headersJson = reader.readStringOrNull(offsets[9]);
+  object.host = reader.readString(offsets[10]);
   object.id = id;
-  object.kind = reader.readString(offsets[2]);
-  object.logo = reader.readStringOrNull(offsets[3]);
-  object.name = reader.readString(offsets[4]);
-  object.sourceId = reader.readLong(offsets[5]);
-  object.streamUrl = reader.readString(offsets[6]);
-  object.updatedAt = reader.readDateTime(offsets[7]);
+  object.imdbDescription = reader.readStringOrNull(offsets[11]);
+  object.imdbId = reader.readStringOrNull(offsets[12]);
+  object.imdbRating = reader.readDoubleOrNull(offsets[13]);
+  object.kind = reader.readString(offsets[14]);
+  object.language = reader.readStringOrNull(offsets[15]);
+  object.logo = reader.readStringOrNull(offsets[16]);
+  object.name = reader.readString(offsets[17]);
+  object.nameOriginal = reader.readStringOrNull(offsets[18]);
+  object.path = reader.readStringOrNull(offsets[19]);
+  object.realUrl = reader.readStringOrNull(offsets[20]);
+  object.referer = reader.readStringOrNull(offsets[21]);
+  object.scheme = reader.readStringOrNull(offsets[22]);
+  object.sourceId = reader.readLong(offsets[23]);
+  object.streamUrl = reader.readString(offsets[24]);
+  object.tvgId = reader.readStringOrNull(offsets[25]);
+  object.tvgName = reader.readStringOrNull(offsets[26]);
+  object.updatedAt = reader.readDateTime(offsets[27]);
+  object.userAgent = reader.readStringOrNull(offsets[28]);
   return object;
 }
 
@@ -1742,21 +2461,63 @@ P _iptvItemDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 2:
-      return (reader.readString(offset)) as P;
-    case 3:
       return (reader.readStringOrNull(offset)) as P;
+    case 3:
+      return (reader.readLongOrNull(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readLong(offset)) as P;
-    case 6:
-      return (reader.readString(offset)) as P;
-    case 7:
       return (reader.readDateTime(offset)) as P;
+    case 6:
+      return (reader.readStringOrNull(offset)) as P;
+    case 7:
+      return (reader.readStringOrNull(offset)) as P;
+    case 8:
+      return (reader.readStringOrNull(offset)) as P;
+    case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
+      return (reader.readString(offset)) as P;
+    case 11:
+      return (reader.readStringOrNull(offset)) as P;
+    case 12:
+      return (reader.readStringOrNull(offset)) as P;
+    case 13:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 14:
+      return (reader.readString(offset)) as P;
+    case 15:
+      return (reader.readStringOrNull(offset)) as P;
+    case 16:
+      return (reader.readStringOrNull(offset)) as P;
+    case 17:
+      return (reader.readString(offset)) as P;
+    case 18:
+      return (reader.readStringOrNull(offset)) as P;
+    case 19:
+      return (reader.readStringOrNull(offset)) as P;
+    case 20:
+      return (reader.readStringOrNull(offset)) as P;
+    case 21:
+      return (reader.readStringOrNull(offset)) as P;
+    case 22:
+      return (reader.readStringOrNull(offset)) as P;
+    case 23:
+      return (reader.readLong(offset)) as P;
+    case 24:
+      return (reader.readString(offset)) as P;
+    case 25:
+      return (reader.readStringOrNull(offset)) as P;
+    case 26:
+      return (reader.readStringOrNull(offset)) as P;
+    case 27:
+      return (reader.readDateTime(offset)) as P;
+    case 28:
+      return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -1778,6 +2539,14 @@ extension IptvItemQueryWhereSort on QueryBuilder<IptvItem, IptvItem, QWhere> {
   QueryBuilder<IptvItem, IptvItem, QAfterWhere> anyId() {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhere> anySourceId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'sourceId'),
+      );
     });
   }
 }
@@ -1847,10 +2616,881 @@ extension IptvItemQueryWhere on QueryBuilder<IptvItem, IptvItem, QWhereClause> {
       ));
     });
   }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> sourceIdEqualTo(
+      int sourceId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'sourceId',
+        value: [sourceId],
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> sourceIdNotEqualTo(
+      int sourceId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sourceId',
+              lower: [],
+              upper: [sourceId],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sourceId',
+              lower: [sourceId],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sourceId',
+              lower: [sourceId],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sourceId',
+              lower: [],
+              upper: [sourceId],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> sourceIdGreaterThan(
+    int sourceId, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'sourceId',
+        lower: [sourceId],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> sourceIdLessThan(
+    int sourceId, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'sourceId',
+        lower: [],
+        upper: [sourceId],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> sourceIdBetween(
+    int lowerSourceId,
+    int upperSourceId, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'sourceId',
+        lower: [lowerSourceId],
+        includeLower: includeLower,
+        upper: [upperSourceId],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> kindEqualTo(String kind) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'kind',
+        value: [kind],
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> kindNotEqualTo(
+      String kind) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'kind',
+              lower: [],
+              upper: [kind],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'kind',
+              lower: [kind],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'kind',
+              lower: [kind],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'kind',
+              lower: [],
+              upper: [kind],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> nameEqualTo(String name) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'name',
+        value: [name],
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> nameNotEqualTo(
+      String name) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'name',
+              lower: [],
+              upper: [name],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'name',
+              lower: [name],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'name',
+              lower: [name],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'name',
+              lower: [],
+              upper: [name],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> hostEqualTo(String host) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'host',
+        value: [host],
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> hostNotEqualTo(
+      String host) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'host',
+              lower: [],
+              upper: [host],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'host',
+              lower: [host],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'host',
+              lower: [host],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'host',
+              lower: [],
+              upper: [host],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> imdbIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'imdbId',
+        value: [null],
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> imdbIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'imdbId',
+        lower: [null],
+        includeLower: false,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> imdbIdEqualTo(
+      String? imdbId) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'imdbId',
+        value: [imdbId],
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterWhereClause> imdbIdNotEqualTo(
+      String? imdbId) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'imdbId',
+              lower: [],
+              upper: [imdbId],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'imdbId',
+              lower: [imdbId],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'imdbId',
+              lower: [imdbId],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'imdbId',
+              lower: [],
+              upper: [imdbId],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
 }
 
 extension IptvItemQueryFilter
     on QueryBuilder<IptvItem, IptvItem, QFilterCondition> {
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'catchup',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'catchup',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'catchup',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'catchup',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'catchup',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'catchup',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'catchup',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'catchup',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'catchup',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'catchup',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'catchup',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'catchup',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupDaysIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'catchupDays',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      catchupDaysIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'catchupDays',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupDaysEqualTo(
+      int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'catchupDays',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      catchupDaysGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'catchupDays',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupDaysLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'catchupDays',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupDaysBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'catchupDays',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      catchupSourceIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'catchupSource',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      catchupSourceIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'catchupSource',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupSourceEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'catchupSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      catchupSourceGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'catchupSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupSourceLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'catchupSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupSourceBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'catchupSource',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      catchupSourceStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'catchupSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupSourceEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'catchupSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupSourceContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'catchupSource',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> catchupSourceMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'catchupSource',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      catchupSourceIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'catchupSource',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      catchupSourceIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'catchupSource',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> chnoIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'chno',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> chnoIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'chno',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> chnoEqualTo(
+      int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'chno',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> chnoGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'chno',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> chnoLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'chno',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> chnoBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'chno',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'country',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'country',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'country',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'country',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'country',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'country',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'country',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'country',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'country',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'country',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'country',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> countryIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'country',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> createdAtEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -1900,6 +3540,298 @@ extension IptvItemQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'epgShift',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'epgShift',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'epgShift',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'epgShift',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'epgShift',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'epgShift',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'epgShift',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'epgShift',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'epgShift',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'epgShift',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'epgShift',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> epgShiftIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'epgShift',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'ext',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'ext',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ext',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'ext',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'ext',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'ext',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'ext',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'ext',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'ext',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'ext',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'ext',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> extIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'ext',
+        value: '',
       ));
     });
   }
@@ -2052,6 +3984,285 @@ extension IptvItemQueryFilter
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> headersJsonIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'headersJson',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      headersJsonIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'headersJson',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> headersJsonEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'headersJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      headersJsonGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'headersJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> headersJsonLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'headersJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> headersJsonBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'headersJson',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> headersJsonStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'headersJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> headersJsonEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'headersJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> headersJsonContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'headersJson',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> headersJsonMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'headersJson',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> headersJsonIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'headersJson',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      headersJsonIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'headersJson',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'host',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'host',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'host',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'host',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'host',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'host',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'host',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'host',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'host',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> hostIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'host',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -2100,6 +4311,385 @@ extension IptvItemQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'imdbDescription',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'imdbDescription',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imdbDescription',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'imdbDescription',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'imdbDescription',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'imdbDescription',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'imdbDescription',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'imdbDescription',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'imdbDescription',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'imdbDescription',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imdbDescription',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbDescriptionIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'imdbDescription',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'imdbId',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'imdbId',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imdbId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'imdbId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'imdbId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'imdbId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'imdbId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'imdbId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'imdbId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'imdbId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imdbId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'imdbId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbRatingIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'imdbRating',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      imdbRatingIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'imdbRating',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbRatingEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'imdbRating',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbRatingGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'imdbRating',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbRatingLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'imdbRating',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> imdbRatingBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'imdbRating',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
       ));
     });
   }
@@ -2229,6 +4819,152 @@ extension IptvItemQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'kind',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'language',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'language',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'language',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'language',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'language',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'language',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'language',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'language',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'language',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'language',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'language',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> languageIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'language',
         value: '',
       ));
     });
@@ -2510,6 +5246,741 @@ extension IptvItemQueryFilter
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> nameOriginalIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'nameOriginal',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      nameOriginalIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'nameOriginal',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> nameOriginalEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'nameOriginal',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      nameOriginalGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'nameOriginal',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> nameOriginalLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'nameOriginal',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> nameOriginalBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'nameOriginal',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      nameOriginalStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'nameOriginal',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> nameOriginalEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'nameOriginal',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> nameOriginalContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'nameOriginal',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> nameOriginalMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'nameOriginal',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      nameOriginalIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'nameOriginal',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      nameOriginalIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'nameOriginal',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'path',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'path',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'path',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'path',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'path',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'path',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'path',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'path',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'path',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'path',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'path',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> pathIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'path',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'realUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'realUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'realUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'realUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'realUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'realUrl',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'realUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'realUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'realUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'realUrl',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'realUrl',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> realUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'realUrl',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'referer',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'referer',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'referer',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'referer',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'referer',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'referer',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'referer',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'referer',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'referer',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'referer',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'referer',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> refererIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'referer',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'scheme',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'scheme',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'scheme',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'scheme',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'scheme',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'scheme',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'scheme',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'scheme',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'scheme',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'scheme',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'scheme',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> schemeIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'scheme',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> sourceIdEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -2694,6 +6165,298 @@ extension IptvItemQueryFilter
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'tvgId',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'tvgId',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'tvgId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'tvgId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'tvgId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'tvgId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'tvgId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'tvgId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'tvgId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'tvgId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'tvgId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'tvgId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'tvgName',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'tvgName',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'tvgName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'tvgName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'tvgName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'tvgName',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'tvgName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'tvgName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'tvgName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'tvgName',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'tvgName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> tvgNameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'tvgName',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> updatedAtEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -2746,6 +6509,153 @@ extension IptvItemQueryFilter
       ));
     });
   }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'userAgent',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'userAgent',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'userAgent',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'userAgent',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'userAgent',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'userAgent',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'userAgent',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'userAgent',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'userAgent',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'userAgent',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition> userAgentIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'userAgent',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterFilterCondition>
+      userAgentIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'userAgent',
+        value: '',
+      ));
+    });
+  }
 }
 
 extension IptvItemQueryObject
@@ -2755,6 +6665,66 @@ extension IptvItemQueryLinks
     on QueryBuilder<IptvItem, IptvItem, QFilterCondition> {}
 
 extension IptvItemQuerySortBy on QueryBuilder<IptvItem, IptvItem, QSortBy> {
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCatchup() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchup', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCatchupDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchup', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCatchupDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchupDays', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCatchupDaysDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchupDays', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCatchupSource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchupSource', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCatchupSourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchupSource', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByChno() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chno', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByChnoDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chno', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCountry() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'country', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCountryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'country', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -2764,6 +6734,30 @@ extension IptvItemQuerySortBy on QueryBuilder<IptvItem, IptvItem, QSortBy> {
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByCreatedAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByEpgShift() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'epgShift', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByEpgShiftDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'epgShift', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByExt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ext', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByExtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ext', Sort.desc);
     });
   }
 
@@ -2779,6 +6773,66 @@ extension IptvItemQuerySortBy on QueryBuilder<IptvItem, IptvItem, QSortBy> {
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByHeadersJson() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'headersJson', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByHeadersJsonDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'headersJson', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByHost() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByHostDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByImdbDescription() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbDescription', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByImdbDescriptionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbDescription', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByImdbId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByImdbIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByImdbRating() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbRating', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByImdbRatingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbRating', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByKind() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'kind', Sort.asc);
@@ -2788,6 +6842,18 @@ extension IptvItemQuerySortBy on QueryBuilder<IptvItem, IptvItem, QSortBy> {
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByKindDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'kind', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByLanguage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'language', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByLanguageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'language', Sort.desc);
     });
   }
 
@@ -2815,6 +6881,66 @@ extension IptvItemQuerySortBy on QueryBuilder<IptvItem, IptvItem, QSortBy> {
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByNameOriginal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'nameOriginal', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByNameOriginalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'nameOriginal', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'path', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'path', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByRealUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'realUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByRealUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'realUrl', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByReferer() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'referer', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByRefererDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'referer', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByScheme() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'scheme', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortBySchemeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'scheme', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortBySourceId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'sourceId', Sort.asc);
@@ -2839,6 +6965,30 @@ extension IptvItemQuerySortBy on QueryBuilder<IptvItem, IptvItem, QSortBy> {
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByTvgId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'tvgId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByTvgIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'tvgId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByTvgName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'tvgName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByTvgNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'tvgName', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAt', Sort.asc);
@@ -2850,10 +7000,82 @@ extension IptvItemQuerySortBy on QueryBuilder<IptvItem, IptvItem, QSortBy> {
       return query.addSortBy(r'updatedAt', Sort.desc);
     });
   }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByUserAgent() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'userAgent', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sortByUserAgentDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'userAgent', Sort.desc);
+    });
+  }
 }
 
 extension IptvItemQuerySortThenBy
     on QueryBuilder<IptvItem, IptvItem, QSortThenBy> {
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCatchup() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchup', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCatchupDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchup', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCatchupDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchupDays', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCatchupDaysDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchupDays', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCatchupSource() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchupSource', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCatchupSourceDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'catchupSource', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByChno() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chno', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByChnoDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chno', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCountry() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'country', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCountryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'country', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.asc);
@@ -2863,6 +7085,30 @@ extension IptvItemQuerySortThenBy
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByCreatedAtDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'createdAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByEpgShift() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'epgShift', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByEpgShiftDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'epgShift', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByExt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ext', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByExtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'ext', Sort.desc);
     });
   }
 
@@ -2878,6 +7124,30 @@ extension IptvItemQuerySortThenBy
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByHeadersJson() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'headersJson', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByHeadersJsonDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'headersJson', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByHost() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByHostDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'host', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -2890,6 +7160,42 @@ extension IptvItemQuerySortThenBy
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByImdbDescription() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbDescription', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByImdbDescriptionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbDescription', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByImdbId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByImdbIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByImdbRating() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbRating', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByImdbRatingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'imdbRating', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByKind() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'kind', Sort.asc);
@@ -2899,6 +7205,18 @@ extension IptvItemQuerySortThenBy
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByKindDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'kind', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByLanguage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'language', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByLanguageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'language', Sort.desc);
     });
   }
 
@@ -2926,6 +7244,66 @@ extension IptvItemQuerySortThenBy
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByNameOriginal() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'nameOriginal', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByNameOriginalDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'nameOriginal', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'path', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'path', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByRealUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'realUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByRealUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'realUrl', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByReferer() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'referer', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByRefererDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'referer', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByScheme() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'scheme', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenBySchemeDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'scheme', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenBySourceId() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'sourceId', Sort.asc);
@@ -2950,6 +7328,30 @@ extension IptvItemQuerySortThenBy
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByTvgId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'tvgId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByTvgIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'tvgId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByTvgName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'tvgName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByTvgNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'tvgName', Sort.desc);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAt', Sort.asc);
@@ -2961,13 +7363,73 @@ extension IptvItemQuerySortThenBy
       return query.addSortBy(r'updatedAt', Sort.desc);
     });
   }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByUserAgent() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'userAgent', Sort.asc);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QAfterSortBy> thenByUserAgentDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'userAgent', Sort.desc);
+    });
+  }
 }
 
 extension IptvItemQueryWhereDistinct
     on QueryBuilder<IptvItem, IptvItem, QDistinct> {
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByCatchup(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'catchup', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByCatchupDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'catchupDays');
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByCatchupSource(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'catchupSource',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByChno() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chno');
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByCountry(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'country', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByCreatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'createdAt');
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByEpgShift(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'epgShift', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByExt(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'ext', caseSensitive: caseSensitive);
     });
   }
 
@@ -2978,10 +7440,52 @@ extension IptvItemQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByHeadersJson(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'headersJson', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByHost(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'host', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByImdbDescription(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'imdbDescription',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByImdbId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'imdbId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByImdbRating() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'imdbRating');
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByKind(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'kind', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByLanguage(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'language', caseSensitive: caseSensitive);
     });
   }
 
@@ -2999,6 +7503,41 @@ extension IptvItemQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByNameOriginal(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'nameOriginal', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByPath(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'path', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByRealUrl(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'realUrl', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByReferer(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'referer', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByScheme(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'scheme', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QDistinct> distinctBySourceId() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'sourceId');
@@ -3012,9 +7551,30 @@ extension IptvItemQueryWhereDistinct
     });
   }
 
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByTvgId(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'tvgId', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByTvgName(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'tvgName', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'updatedAt');
+    });
+  }
+
+  QueryBuilder<IptvItem, IptvItem, QDistinct> distinctByUserAgent(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'userAgent', caseSensitive: caseSensitive);
     });
   }
 }
@@ -3027,9 +7587,51 @@ extension IptvItemQueryProperty
     });
   }
 
+  QueryBuilder<IptvItem, String?, QQueryOperations> catchupProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'catchup');
+    });
+  }
+
+  QueryBuilder<IptvItem, int?, QQueryOperations> catchupDaysProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'catchupDays');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> catchupSourceProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'catchupSource');
+    });
+  }
+
+  QueryBuilder<IptvItem, int?, QQueryOperations> chnoProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chno');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> countryProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'country');
+    });
+  }
+
   QueryBuilder<IptvItem, DateTime, QQueryOperations> createdAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'createdAt');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> epgShiftProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'epgShift');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> extProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'ext');
     });
   }
 
@@ -3039,9 +7641,45 @@ extension IptvItemQueryProperty
     });
   }
 
+  QueryBuilder<IptvItem, String?, QQueryOperations> headersJsonProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'headersJson');
+    });
+  }
+
+  QueryBuilder<IptvItem, String, QQueryOperations> hostProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'host');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> imdbDescriptionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'imdbDescription');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> imdbIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'imdbId');
+    });
+  }
+
+  QueryBuilder<IptvItem, double?, QQueryOperations> imdbRatingProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'imdbRating');
+    });
+  }
+
   QueryBuilder<IptvItem, String, QQueryOperations> kindProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'kind');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> languageProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'language');
     });
   }
 
@@ -3057,6 +7695,36 @@ extension IptvItemQueryProperty
     });
   }
 
+  QueryBuilder<IptvItem, String?, QQueryOperations> nameOriginalProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'nameOriginal');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> pathProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'path');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> realUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'realUrl');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> refererProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'referer');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> schemeProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'scheme');
+    });
+  }
+
   QueryBuilder<IptvItem, int, QQueryOperations> sourceIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'sourceId');
@@ -3069,9 +7737,27 @@ extension IptvItemQueryProperty
     });
   }
 
+  QueryBuilder<IptvItem, String?, QQueryOperations> tvgIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'tvgId');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> tvgNameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'tvgName');
+    });
+  }
+
   QueryBuilder<IptvItem, DateTime, QQueryOperations> updatedAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'updatedAt');
+    });
+  }
+
+  QueryBuilder<IptvItem, String?, QQueryOperations> userAgentProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'userAgent');
     });
   }
 }

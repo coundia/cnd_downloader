@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:isar/isar.dart';
 import '../services/m3u_parser.dart';
 import 'iptv_models.dart';
 import 'db.dart';
+import '../core/settings.dart';
 
 class IptvRepository {
   final Isar _isar = AppDb.isar;
@@ -50,8 +52,67 @@ class IptvRepository {
   Future<void> refreshSource(int sourceId) async {
     final src = await _isar.iptvSources.get(sourceId);
     if (src == null || src.url == null) return;
+
     final data = await _fetch(src.url!);
-    final entries = _parser.parse(data);
+    final doc = _parser.parseDocument(data);
+
+    src.urlTvg = doc.header['url-tvg'] ?? src.urlTvg;
+    src.provider = doc.header['provider-name'] ?? src.provider;
+
+    final items = <IptvItem>[];
+    for (final e in doc.entries) {
+      final u = Uri.tryParse(e.url);
+      final host = u?.host ?? '';
+      final scheme = u?.scheme;
+      final path = u?.path;
+      final ext = path != null && path.contains('.')
+          ? path.split('.').last.toLowerCase()
+          : null;
+
+      final headers = <String, String>{};
+      if ((e.userAgent ?? '').isNotEmpty) headers['user-agent'] = e.userAgent!;
+      if ((e.referer ?? '').isNotEmpty) headers['referer'] = e.referer!;
+      if ((settings.defaultUserAgent).trim().isNotEmpty &&
+          headers['user-agent'] == null) {
+        headers['user-agent'] = settings.defaultUserAgent.trim();
+      }
+      if ((settings.defaultReferer ?? '').trim().isNotEmpty &&
+          headers['referer'] == null) {
+        headers['referer'] = settings.defaultReferer!.trim();
+      }
+      final headersJson = headers.isEmpty ? null : jsonEncode(headers);
+
+      final it = IptvItem()
+        ..sourceId = sourceId
+        ..kind = e.kind
+        ..name = e.name
+        ..nameOriginal = e.nameOriginal
+        ..groupTitle = e.group
+        ..tvgId = e.tvgId
+        ..tvgName = e.tvgName
+        ..logo = e.logo
+        ..country = e.country
+        ..language = e.language
+        ..chno = e.chno
+        ..catchup = e.catchup
+        ..catchupSource = e.catchupSource
+        ..catchupDays = e.catchupDays
+        ..epgShift = e.epgShift
+        ..userAgent = e.userAgent
+        ..referer = e.referer
+        ..headersJson = headersJson
+        ..host = host
+        ..scheme = scheme
+        ..path = path
+        ..ext = ext
+        ..imdbId = e.imdbId
+        ..imdbRating = e.imdbRating
+        ..imdbDescription = e.imdbDescription
+        ..streamUrl = e.url;
+
+      items.add(it);
+    }
+
     await _isar.writeTxn(() async {
       final oldIds = await _isar.iptvItems
           .filter()
@@ -59,17 +120,6 @@ class IptvRepository {
           .idProperty()
           .findAll();
       await _isar.iptvItems.deleteAll(oldIds);
-      final items = entries
-          .map(
-            (e) => IptvItem()
-              ..sourceId = sourceId
-              ..kind = e.kind
-              ..name = e.name
-              ..groupTitle = e.group
-              ..logo = e.logo
-              ..streamUrl = e.url,
-          )
-          .toList();
       await _isar.iptvItems.putAll(items);
       src.updatedAt = DateTime.now();
       await _isar.iptvSources.put(src);
@@ -97,6 +147,12 @@ class IptvRepository {
         responseType: ResponseType.plain,
         followRedirects: true,
         maxRedirects: 10,
+        headers: {
+          if ((settings.defaultUserAgent).trim().isNotEmpty)
+            'user-agent': settings.defaultUserAgent.trim(),
+          if ((settings.defaultReferer ?? '').trim().isNotEmpty)
+            'referer': settings.defaultReferer!.trim(),
+        },
       ),
     );
     return r.data ?? '';

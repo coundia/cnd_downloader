@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +21,14 @@ class MovieDetailsPage extends ConsumerStatefulWidget {
 class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
   late final Future<_OmdbData?> _omdbFuture;
 
+  // Debug UI state
+  String? _dbgStep;
+  String? _dbgUrl;
+  int? _dbgStatus;
+  String? _dbgBody;
+  String? _dbgError;
+  bool _showDebug = false;
+
   @override
   void initState() {
     super.initState();
@@ -35,29 +44,150 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
     return h;
   }
 
-  Future<_OmdbData?> _fetchOmdb(String rawTitle) async {
-    final key = settings.omdbApiKey?.trim();
-    if (key == null || key.isEmpty) return null;
-    final cleaned = rawTitle
+  String? _extractYear(String title) {
+    final m = RegExp(r'(^|\D)(19|20)\d{2}(\D|$)').firstMatch(title);
+    if (m == null) return null;
+    return title.substring(m.start, m.end).replaceAll(RegExp(r'\D'), '');
+  }
+
+  String _cleanTitle(String raw) {
+    return raw
         .replaceAll(RegExp(r'\[[^\]]*\]'), '')
         .replaceAll(RegExp(r'\([^\)]*\)'), '')
         .replaceAll(RegExp(r'\{[^\}]*\}'), '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
-    final uri = Uri.https('www.omdbapi.com', '/', {
-      't': cleaned,
-      'apikey': key,
-      'plot': 'short',
-    });
+  }
+
+  Dio _dio() {
+    final d = Dio(
+      BaseOptions(
+        connectTimeout: Duration(milliseconds: settings.connectTimeoutMs),
+        receiveTimeout: Duration(milliseconds: settings.receiveTimeoutMs),
+        headers: {'user-agent': settings.defaultUserAgent},
+        responseType: ResponseType.json,
+      ),
+    );
+    d.interceptors.add(
+      LogInterceptor(
+        request: true,
+        requestHeader: true,
+        responseHeader: false,
+        responseBody: true,
+        error: true,
+        logPrint: (o) => debugPrint('[OMDb] $o'),
+      ),
+    );
+    return d;
+  }
+
+  Future<_OmdbData?> _fetchOmdb(String rawTitle) async {
+    final key = settings.omdbApiKey?.trim();
+    if (key == null || key.isEmpty) return null;
+
+    final dio = _dio();
+    final cleaned = _cleanTitle(rawTitle);
+    final y = _extractYear(rawTitle);
+
+    // Step 1: by Title
     try {
-      final resp = await Dio().getUri(uri);
-      if (resp.statusCode == 200 && resp.data is Map) {
-        final m = Map<String, dynamic>.from(resp.data as Map);
-        if ((m['Response'] as String?)?.toLowerCase() == 'true') {
+      _dbgStep = 'by title';
+      final uri1 = Uri.https('www.omdbapi.com', '/', {
+        't': cleaned,
+        'type': 'movie',
+        if (y != null) 'y': y,
+        'plot': 'full',
+        'r': 'json',
+        'apikey': key,
+      });
+      setState(() {
+        _dbgUrl = uri1.toString();
+        _dbgStatus = null;
+        _dbgBody = null;
+        _dbgError = null;
+      });
+      final r1 = await dio.getUri(uri1);
+      setState(() {
+        _dbgStatus = r1.statusCode;
+        final s = r1.data.toString();
+        _dbgBody = s.length > 2000 ? '${s.substring(0, 2000)}…' : s;
+      });
+      if (r1.statusCode == 200 && r1.data is Map) {
+        final m = Map<String, dynamic>.from(r1.data as Map);
+        if ((m['Response']?.toString().toLowerCase() ?? '') == 'true') {
           return _OmdbData.fromJson(m);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      setState(() => _dbgError = e.toString());
+    }
+
+    // Step 2: search by 's', then fetch by 'i'
+    try {
+      _dbgStep = 'search';
+      final uri2 = Uri.https('www.omdbapi.com', '/', {
+        's': cleaned,
+        'type': 'movie',
+        if (y != null) 'y': y,
+        'page': '1',
+        'r': 'json',
+        'apikey': key,
+      });
+      setState(() {
+        _dbgUrl = uri2.toString();
+        _dbgStatus = null;
+        _dbgBody = null;
+        _dbgError = null;
+      });
+      final r2 = await dio.getUri(uri2);
+      setState(() {
+        _dbgStatus = r2.statusCode;
+        final s = r2.data.toString();
+        _dbgBody = s.length > 2000 ? '${s.substring(0, 2000)}…' : s;
+      });
+      if (r2.statusCode == 200 && r2.data is Map) {
+        final m = Map<String, dynamic>.from(r2.data as Map);
+        final arr = (m['Search'] as List?)?.cast<Map?>() ?? const [];
+        if (arr.isNotEmpty) {
+          Map best = arr.first!;
+          // tente un match plus strict sur le titre
+          final lc = cleaned.toLowerCase();
+          for (final e in arr) {
+            final tt = (e?['Title'] ?? '').toString().toLowerCase();
+            if (tt == lc) {
+              best = e!;
+              break;
+            }
+          }
+          final imdbID = (best['imdbID'] ?? '').toString();
+          if (imdbID.isNotEmpty) {
+            _dbgStep = 'by id';
+            final uri3 = Uri.https('www.omdbapi.com', '/', {
+              'i': imdbID,
+              'plot': 'full',
+              'r': 'json',
+              'apikey': key,
+            });
+            setState(() => _dbgUrl = uri3.toString());
+            final r3 = await dio.getUri(uri3);
+            setState(() {
+              _dbgStatus = r3.statusCode;
+              final s = r3.data.toString();
+              _dbgBody = s.length > 2000 ? '${s.substring(0, 2000)}…' : s;
+            });
+            if (r3.statusCode == 200 && r3.data is Map) {
+              final m3 = Map<String, dynamic>.from(r3.data as Map);
+              if ((m3['Response']?.toString().toLowerCase() ?? '') == 'true') {
+                return _OmdbData.fromJson(m3);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      setState(() => _dbgError = e.toString());
+    }
+
     return null;
   }
 
@@ -74,6 +204,11 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          IconButton(
+            tooltip: 'Debug',
+            onPressed: () => setState(() => _showDebug = !_showDebug),
+            icon: const Icon(Icons.bug_report),
+          ),
           IconButton(
             tooltip: 'Copy URL',
             onPressed: () async {
@@ -92,59 +227,70 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _PosterImage(url: widget.item.logo),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.transparent, Colors.black26],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Center(
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 14,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      onPressed: () {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (!mounted) return;
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => MoviePlayerPage(
-                                title: widget.item.name,
-                                url: widget.item.streamUrl,
-                                headers: _headers(),
-                              ),
+          FutureBuilder<_OmdbData?>(
+            future: _omdbFuture,
+            builder: (context, snap) {
+              final d = snap.data;
+              final poster = d?.posterUrl?.isNotEmpty == true
+                  ? d!.posterUrl
+                  : widget.item.logo;
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _PosterImage(url: poster),
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.transparent, Colors.black26],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
                             ),
-                          );
-                        });
-                      },
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('Play'),
-                    ),
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                          ),
+                          onPressed: () {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => MoviePlayerPage(
+                                    title: widget.item.name,
+                                    url: widget.item.streamUrl,
+                                    headers: _headers(),
+                                  ),
+                                ),
+                              );
+                            });
+                          },
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('Play'),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
+
           const SizedBox(height: 12),
+
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -153,7 +299,9 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
               _Chip(text: host),
             ],
           ),
+
           const SizedBox(height: 12),
+
           FutureBuilder<_OmdbData?>(
             future: _omdbFuture,
             builder: (context, snap) {
@@ -165,23 +313,50 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
                 final keyMissing =
                     (settings.omdbApiKey == null ||
                     settings.omdbApiKey!.trim().isEmpty);
-                return keyMissing
-                    ? Container(
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (keyMissing)
+                      Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           border: Border.all(color: theme.dividerColor),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Text(
-                          'OMDb indisponible. Renseigner OMDb API Key dans Settings.',
+                          'OMDb indisponible. Ajouter OMDb API Key dans Settings.',
                         ),
-                      )
-                    : const SizedBox.shrink();
+                      ),
+                    if (_showDebug)
+                      _DebugBlock(
+                        step: _dbgStep,
+                        url: _dbgUrl,
+                        status: _dbgStatus,
+                        body: _dbgBody,
+                        error: _dbgError,
+                      ),
+                  ],
+                );
               }
-              return _OmdbCard(data: d);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _OmdbCard(data: d),
+                  if (_showDebug)
+                    _DebugBlock(
+                      step: _dbgStep,
+                      url: _dbgUrl,
+                      status: _dbgStatus,
+                      body: _dbgBody,
+                      error: _dbgError,
+                    ),
+                ],
+              );
             },
           ),
+
           const SizedBox(height: 12),
+
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(10),
@@ -197,7 +372,9 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
               ),
             ),
           ),
+
           const SizedBox(height: 16),
+
           LayoutBuilder(
             builder: (c, bc) {
               final narrow = bc.maxWidth < 420;
@@ -339,6 +516,7 @@ class _OmdbData {
   final String imdbID;
   final double rating10;
   final String votes;
+  final String? posterUrl;
 
   _OmdbData({
     required this.title,
@@ -349,10 +527,12 @@ class _OmdbData {
     required this.imdbID,
     required this.rating10,
     required this.votes,
+    required this.posterUrl,
   });
 
   factory _OmdbData.fromJson(Map<String, dynamic> m) {
     final r = double.tryParse((m['imdbRating'] ?? '').toString()) ?? 0.0;
+    final poster = (m['Poster'] ?? '').toString();
     return _OmdbData(
       title: (m['Title'] ?? '').toString(),
       year: (m['Year'] ?? '').toString(),
@@ -362,6 +542,7 @@ class _OmdbData {
       imdbID: (m['imdbID'] ?? '').toString(),
       rating10: r,
       votes: (m['imdbVotes'] ?? '').toString(),
+      posterUrl: poster.isEmpty || poster == 'N/A' ? null : poster,
     );
   }
 }
@@ -459,6 +640,44 @@ class _OmdbSkeleton extends StatelessWidget {
           height: 20,
           width: 20,
           child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+    );
+  }
+}
+
+class _DebugBlock extends StatelessWidget {
+  final String? step;
+  final String? url;
+  final int? status;
+  final String? body;
+  final String? error;
+  const _DebugBlock({this.step, this.url, this.status, this.body, this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+    final mono = t.bodySmall?.copyWith(
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DefaultTextStyle(
+        style: mono ?? const TextStyle(fontSize: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('OMDb request (${step ?? 'n/a'})'),
+            if (url != null) Text('URL: $url'),
+            if (status != null) Text('Status: $status'),
+            if (error != null) Text('Error: $error'),
+            if (body != null) Text('Body: $body'),
+          ],
         ),
       ),
     );
