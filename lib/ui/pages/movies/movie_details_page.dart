@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:isar/isar.dart';
 
 import '../../../../data/iptv_models.dart';
 import '../../../../core/settings.dart';
@@ -31,7 +32,29 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
   @override
   void initState() {
     super.initState();
-    _omdbFuture = _fetchOmdb(widget.item.name);
+    _omdbFuture = _fetchAndPersist(widget.item);
+  }
+
+  Future<_OmdbData?> _fetchAndPersist(IptvItem item) async {
+    final d = await _fetchOmdb(item.name);
+    if (d != null) {
+      await _persistOmdbToDb(item.id, d);
+    }
+    return d;
+  }
+
+  Future<void> _persistOmdbToDb(int itemId, _OmdbData d) async {
+    final isar = Isar.getInstance();
+    if (isar == null) return;
+    await isar.writeTxn(() async {
+      final cur = await isar.iptvItems.get(itemId);
+      if (cur == null) return;
+      if (d.imdbID.isNotEmpty) cur.imdbId = d.imdbID;
+      if (d.rating10 > 0) cur.imdbRating = d.rating10;
+      if (d.plot.isNotEmpty) cur.imdbDescription = d.plot;
+      cur.updatedAt = DateTime.now();
+      await isar.iptvItems.put(cur);
+    });
   }
 
   Map<String, String> _headers() {

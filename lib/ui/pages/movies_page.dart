@@ -29,7 +29,7 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(child: Text('Error')),
         data: (list) {
-          final allGroups = _uniqueGroups(list);
+          final allGroups = _uniqueGroups(list); // includes '' for "All"
           final allHosts = _uniqueHosts(list);
 
           final ql = q.toLowerCase().trim();
@@ -74,6 +74,7 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
 
           return Column(
             children: [
+              // Top search + dropdown filters (kept)
               SearchFilterBar(
                 query: q,
                 onQuery: (v) => setState(() => q = v),
@@ -89,6 +90,15 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                 sortAsc: sortAsc,
                 onToggleAsc: () => setState(() => sortAsc = !sortAsc),
               ),
+
+              // New: category buttons (chips) that filter by group
+              _GroupChipsBar(
+                groups: allGroups,
+                selected: group,
+                onSelect: (g) =>
+                    setState(() => group = g?.isEmpty == true ? null : g),
+              ),
+
               const Divider(height: 1),
               Expanded(child: grid),
             ],
@@ -103,6 +113,7 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
     for (final e in list) {
       set.add((e.groupTitle ?? 'Other').trim());
     }
+    // '' = All
     return [''].followedBy(set).toList();
   }
 
@@ -144,5 +155,46 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
     }
 
     list.sort(cmp);
+  }
+}
+
+class _GroupChipsBar extends StatelessWidget {
+  final List<String> groups; // first item is '' => All
+  final String? selected; // nullable => All
+  final ValueChanged<String?> onSelect;
+
+  const _GroupChipsBar({
+    required this.groups,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (groups.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        scrollDirection: Axis.horizontal,
+        itemCount: groups.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final g = groups[i];
+          final isAll = g.isEmpty;
+          final label = isAll ? 'All' : g;
+          final sel = (selected == null || selected!.isEmpty)
+              ? isAll
+              : selected == g;
+
+          return ChoiceChip(
+            label: Text(label, overflow: TextOverflow.ellipsis),
+            selected: sel,
+            onSelected: (_) => onSelect(isAll ? '' : g),
+          );
+        },
+      ),
+    );
   }
 }
