@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/iptv_models.dart';
 import '../../../viewmodels/iptv_vm.dart';
 import 'movies/movie_details_page.dart';
-import 'movies/widgets/movie_grid.dart';
 import 'widgets/search_filter_bar.dart';
 
 class MoviesPage extends ConsumerStatefulWidget {
@@ -94,9 +93,8 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
             filtered.length.toString(),
           ].join('|');
 
-          final grid = MovieGrid(
+          final grid = MovieGridWithRatings(
             items: filtered,
-            selected: null,
             onSelect: onPick,
             identity: identity,
           );
@@ -223,6 +221,158 @@ class _GroupChipsBar extends StatelessWidget {
             onSelected: (_) => onSelect(isAll ? '' : g),
           );
         },
+      ),
+    );
+  }
+}
+
+class MovieGridWithRatings extends StatelessWidget {
+  final List<IptvItem> items;
+  final void Function(IptvItem) onSelect;
+  final String identity;
+
+  const MovieGridWithRatings({
+    super.key,
+    required this.items,
+    required this.onSelect,
+    required this.identity,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (c, bc) {
+        final w = bc.maxWidth;
+        final cross = w >= 1600
+            ? 7
+            : w >= 1400
+            ? 6
+            : w >= 1200
+            ? 5
+            : w >= 900
+            ? 4
+            : w >= 600
+            ? 3
+            : 2;
+        return GridView.builder(
+          key: ValueKey(identity),
+          padding: const EdgeInsets.all(12),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cross,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            // Slightly taller tiles reduce overflow risk on large text scales
+            childAspectRatio: 0.65,
+          ),
+          itemCount: items.length,
+          itemBuilder: (_, i) =>
+              _MovieTile(item: items[i], onTap: () => onSelect(items[i])),
+        );
+      },
+    );
+  }
+}
+
+class _MovieTile extends StatelessWidget {
+  final IptvItem item;
+  final VoidCallback onTap;
+
+  const _MovieTile({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final rating = item.imdbRating ?? 0;
+    final hasRating = rating > 0 && rating < 10;
+    final poster = item.logo;
+
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Poster stretches to fill remaining height
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Use FittedBox behavior via BoxFit.cover so aspect is preserved without fixed height
+                  if ((poster ?? '').isNotEmpty)
+                    Image.network(
+                      poster!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const ColoredBox(color: Color(0xFF111111)),
+                      loadingBuilder: (c, child, p) => p == null
+                          ? child
+                          : const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                    )
+                  else
+                    const ColoredBox(color: Color(0xFF111111)),
+                  if (hasRating)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              size: 14,
+                              color: Colors.amber,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              rating.toStringAsFixed(1),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Texts are Flexible to avoid forcing extra height
+          Flexible(
+            child: Text(
+              item.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Flexible(
+            child: Text(
+              item.groupTitle ?? '',
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }
