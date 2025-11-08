@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/iptv_models.dart';
 import '../../../viewmodels/iptv_vm.dart';
-import 'movies/movie_details_page.dart';
+import 'movies/movie_details_page.dart'; // <-- page détails
 import 'movies/widgets/movie_grid.dart';
 import 'widgets/search_filter_bar.dart';
 import 'widgets/movie_grid.dart';
@@ -51,34 +51,14 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
 
           _sortInPlace(filtered, sortKey, sortAsc);
 
-          if (filtered.isEmpty) {
-            return Column(
-              children: [
-                SearchFilterBar(
-                  query: q,
-                  onQuery: (v) => setState(() => q = v),
-                  groups: allGroups,
-                  selectedGroup: group,
-                  onSelectGroup: (v) => setState(() => group = v),
-                  hosts: allHosts,
-                  selectedHost: host,
-                  onSelectHost: (v) => setState(() => host = v),
-                  sortKeys: const ['Name', 'Group', 'Host'],
-                  selectedSortKey: sortKey,
-                  onSelectSortKey: (v) => setState(() => sortKey = v ?? 'Name'),
-                  sortAsc: sortAsc,
-                  onToggleAsc: () => setState(() => sortAsc = !sortAsc),
-                ),
-                const Divider(height: 1),
-                const Expanded(child: Center(child: Text('No movie found'))),
-              ],
-            );
-          }
-
           void onPick(IptvItem it) {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => MovieDetailsPage(item: it)),
-            );
+            // évite push durant update de device/gesture
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => MovieDetailsPage(item: it)),
+              );
+            });
           }
 
           final grid = MovieGrid(
