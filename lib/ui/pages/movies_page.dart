@@ -73,7 +73,6 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
               final sel = selected ?? filtered.first;
               return Row(
                 children: [
-                  // Grid takes the remaining width
                   SizedBox(width: bc.maxWidth - detailsW - 1, child: grid),
                   const VerticalDivider(width: 1),
                   SizedBox(
@@ -174,45 +173,63 @@ class _Poster extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: selected ? BorderSide(color: primary, width: 2) : BorderSide.none,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          children: [
-            AspectRatio(
-              aspectRatio: 2 / 3,
-              child: (item.logo ?? '').isNotEmpty
-                  ? Image.network(
-                      item.logo!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const ColoredBox(color: Color(0xFFECECEC)),
-                    )
-                  : const ColoredBox(color: Color(0xFFECECEC)),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-              child: Text(
-                item.name,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+    return LayoutBuilder(
+      builder: (ctx, cons) {
+        return Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: selected
+                ? BorderSide(color: primary, width: 2)
+                : BorderSide.none,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              height: cons.maxHeight,
+              width: cons.maxWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.max,
+                children: [
+                  Expanded(child: _PosterImage(url: item.logo)),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+                    child: Text(
+                      item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _Chip(text: item.groupTitle ?? 'Movie'),
+                    ),
+                  ),
+                ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: _Chip(text: item.groupTitle ?? 'Movie'),
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PosterImage extends StatelessWidget {
+  final String? url;
+  const _PosterImage({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    if ((url ?? '').isEmpty) {
+      return const ColoredBox(color: Color(0xFFECECEC));
+    }
+    return Image.network(
+      url!,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFFECECEC)),
     );
   }
 }
@@ -348,43 +365,38 @@ class _ActionsBar extends ConsumerWidget {
     return LayoutBuilder(
       builder: (c, bc) {
         final narrow = bc.maxWidth < 360;
-        final children = [
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: () => _openUrlExternally(streamUrl, context),
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('Watch'),
-            ),
+        final watchBtn = Expanded(
+          child: FilledButton.icon(
+            onPressed: () => _openUrlExternally(streamUrl, context),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Watch'),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () async {
-                final dir = await defaultDownloadDir();
-                await ref.read(listVmProvider.notifier).addOnly(streamUrl, dir);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Queued to Downloads')),
-                  );
-                }
-              },
-              icon: const Icon(Icons.download),
-              label: const Text('Download'),
-            ),
+        );
+        final downloadBtn = Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              final dir = await defaultDownloadDir();
+              await ref.read(listVmProvider.notifier).addOnly(streamUrl, dir);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Queued to Downloads')),
+                );
+              }
+            },
+            icon: const Icon(Icons.download),
+            label: const Text('Download'),
           ),
-        ];
+        );
 
         if (narrow) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              children[0],
-              const SizedBox(height: 10),
-              children[2], // OutlinedButton wrapped
-            ],
+            children: [watchBtn, const SizedBox(height: 10), downloadBtn],
           );
         }
-        return Row(children: children);
+        return Row(
+          children: [watchBtn, const SizedBox(width: 10), downloadBtn],
+        );
       },
     );
   }
