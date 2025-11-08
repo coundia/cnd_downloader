@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/iptv_models.dart';
 import '../../../viewmodels/iptv_vm.dart';
 import 'movies/movie_details_page.dart';
+
+// ---- SearchFilterBar (unchanged) is in its own file ----
+// If you inlined it, you can leave it as-is.
 import 'widgets/search_filter_bar.dart';
 
 class MoviesPage extends ConsumerStatefulWidget {
@@ -114,7 +117,8 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                 hosts: allHosts,
                 selectedHost: host,
                 onSelectHost: (v) => setState(() => host = v),
-                sortKeys: const ['Name', 'Group', 'Host'],
+                // Added "Rating" here
+                sortKeys: const ['Name', 'Group', 'Host', 'Rating'],
                 selectedSortKey: sortKey,
                 onSelectSortKey: (v) => setState(() => sortKey = v ?? 'Name'),
                 sortAsc: sortAsc,
@@ -176,6 +180,12 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
           r = _safeHost(
             a.streamUrl,
           ).toLowerCase().compareTo(_safeHost(b.streamUrl).toLowerCase());
+          break;
+        case 'Rating':
+          // Null or missing ratings sort last.
+          final ar = a.imdbRating ?? -1.0;
+          final br = b.imdbRating ?? -1.0;
+          r = ar.compareTo(br);
           break;
         default:
           r = a.name.toLowerCase().compareTo(b.name.toLowerCase());
@@ -261,7 +271,6 @@ class MovieGridWithRatings extends StatelessWidget {
             crossAxisCount: cross,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            // Slightly taller tiles reduce overflow risk on large text scales
             childAspectRatio: 0.65,
           ),
           itemCount: items.length,
@@ -290,14 +299,12 @@ class _MovieTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Poster stretches to fill remaining height
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Use FittedBox behavior via BoxFit.cover so aspect is preserved without fixed height
                   if ((poster ?? '').isNotEmpty)
                     Image.network(
                       poster!,
@@ -355,7 +362,6 @@ class _MovieTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          // Texts are Flexible to avoid forcing extra height
           Flexible(
             child: Text(
               item.name,
