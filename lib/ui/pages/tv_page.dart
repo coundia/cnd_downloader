@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../viewmodels/iptv_vm.dart';
 import '../../data/iptv_models.dart';
+import '../sources/sources_page.dart';
+import '../sources/source_form_page.dart';
 
 class TvPage extends ConsumerStatefulWidget {
   const TvPage({super.key});
@@ -23,8 +25,30 @@ class _TvPageState extends ConsumerState<TvPage> {
         actions: [
           IconButton(
             tooltip: 'Sources',
-            onPressed: () => _openSources(context),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SourcesPage()),
+            ),
             icon: const Icon(Icons.playlist_play),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'add') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SourceFormPage()),
+                );
+              } else if (v == 'sources') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SourcesPage()),
+                );
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'add', child: Text('Ajouter une source')),
+              PopupMenuItem(value: 'sources', child: Text('Gérer les sources')),
+            ],
           ),
         ],
         bottom: PreferredSize(
@@ -58,8 +82,9 @@ class _TvPageState extends ConsumerState<TvPage> {
                               .contains(q),
                         )
                         .toList();
-              if (filtered.isEmpty)
+              if (filtered.isEmpty) {
                 return const Center(child: Text('Aucune chaîne'));
+              }
               return LayoutBuilder(
                 builder: (c, bc) {
                   final w = bc.maxWidth;
@@ -96,66 +121,13 @@ class _TvPageState extends ConsumerState<TvPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openAddSource(context),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SourceFormPage()),
+        ),
         icon: const Icon(Icons.add),
         label: const Text('Ajouter source'),
       ),
-    );
-  }
-
-  Future<void> _openAddSource(BuildContext context) async {
-    await showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => const _AddIptvSourceSheet(),
-    );
-  }
-
-  Future<void> _openSources(BuildContext context) async {
-    await showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (c) {
-        final sources = ref.watch(sourcesProvider);
-        final vm = ref.read(iptvVmProvider.notifier);
-        return SizedBox(
-          height: 420,
-          child: sources.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Center(child: Text('Erreur')),
-            data: (list) => list.isEmpty
-                ? const Center(child: Text('Aucune source'))
-                : ListView.separated(
-                    itemCount: list.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (_, i) {
-                      final s = list[i];
-                      return ListTile(
-                        title: Text(s.name),
-                        subtitle: Text(
-                          '${s.type.toUpperCase()} • ${s.url ?? s.server ?? ''}',
-                        ),
-                        trailing: Wrap(
-                          spacing: 8,
-                          children: [
-                            IconButton(
-                              onPressed: () => vm.refresh(s.id),
-                              icon: const Icon(Icons.refresh),
-                            ),
-                            IconButton(
-                              onPressed: () => vm.remove(s.id),
-                              icon: const Icon(Icons.delete_forever),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        );
-      },
     );
   }
 }
@@ -198,155 +170,6 @@ class _ChannelCard extends StatelessWidget {
             const SizedBox(width: 6),
             const Icon(Icons.play_arrow),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AddIptvSourceSheet extends ConsumerStatefulWidget {
-  const _AddIptvSourceSheet({super.key});
-  @override
-  ConsumerState<_AddIptvSourceSheet> createState() =>
-      _AddIptvSourceSheetState();
-}
-
-class _AddIptvSourceSheetState extends ConsumerState<_AddIptvSourceSheet>
-    with SingleTickerProviderStateMixin {
-  late final TabController tab = TabController(length: 2, vsync: this);
-  final nameCtrl = TextEditingController();
-  final m3uCtrl = TextEditingController();
-  final serverCtrl = TextEditingController();
-  final userCtrl = TextEditingController();
-  final passCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    tab.dispose();
-    nameCtrl.dispose();
-    m3uCtrl.dispose();
-    serverCtrl.dispose();
-    userCtrl.dispose();
-    passCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = ref.read(iptvVmProvider.notifier);
-    final isLoading = ref.watch(iptvVmProvider).isLoading;
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Ajouter une source IPTV',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                decoration: const InputDecoration(labelText: 'Nom'),
-                controller: nameCtrl,
-              ),
-              const SizedBox(height: 12),
-              TabBar(
-                controller: tab,
-                tabs: const [
-                  Tab(text: 'M3U'),
-                  Tab(text: 'Xtream'),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 160,
-                child: TabBarView(
-                  controller: tab,
-                  children: [
-                    Column(
-                      children: [
-                        TextField(
-                          decoration: const InputDecoration(
-                            labelText: 'URL M3U',
-                          ),
-                          controller: m3uCtrl,
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        TextField(
-                          decoration: const InputDecoration(
-                            labelText: 'Serveur (ex: http://host:port)',
-                          ),
-                          controller: serverCtrl,
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          decoration: const InputDecoration(
-                            labelText: 'Username',
-                          ),
-                          controller: userCtrl,
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                          ),
-                          controller: passCtrl,
-                          obscureText: true,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  OutlinedButton(
-                    onPressed: isLoading ? null : () => Navigator.pop(context),
-                    child: const Text('Annuler'),
-                  ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: isLoading
-                        ? null
-                        : () async {
-                            final name = nameCtrl.text.trim().isEmpty
-                                ? 'Source'
-                                : nameCtrl.text.trim();
-                            if (tab.index == 0) {
-                              final url = m3uCtrl.text.trim();
-                              if (url.startsWith('http')) {
-                                await vm.addM3u(name, url);
-                                if (mounted) Navigator.pop(context);
-                              }
-                            } else {
-                              final s = serverCtrl.text.trim();
-                              final u = userCtrl.text.trim();
-                              final p = passCtrl.text.trim();
-                              if (s.isNotEmpty &&
-                                  u.isNotEmpty &&
-                                  p.isNotEmpty) {
-                                await vm.addXtream(name, s, u, p);
-                                if (mounted) Navigator.pop(context);
-                              }
-                            }
-                          },
-                    child: const Text('Ajouter'),
-                  ),
-                ],
-              ),
-            ],
-          ),
         ),
       ),
     );

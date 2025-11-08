@@ -21,7 +21,6 @@ class MovieDetailsPage extends ConsumerStatefulWidget {
 class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
   late final Future<_OmdbData?> _omdbFuture;
 
-  // Debug UI state
   String? _dbgStep;
   String? _dbgUrl;
   int? _dbgStatus;
@@ -42,21 +41,6 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
     final ref = (settings.defaultReferer ?? '').trim();
     if (ref.isNotEmpty) h['referer'] = ref;
     return h;
-  }
-
-  String? _extractYear(String title) {
-    final m = RegExp(r'(^|\D)(19|20)\d{2}(\D|$)').firstMatch(title);
-    if (m == null) return null;
-    return title.substring(m.start, m.end).replaceAll(RegExp(r'\D'), '');
-  }
-
-  String _cleanTitle(String raw) {
-    return raw
-        .replaceAll(RegExp(r'\[[^\]]*\]'), '')
-        .replaceAll(RegExp(r'\([^\)]*\)'), '')
-        .replaceAll(RegExp(r'\{[^\}]*\}'), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
   }
 
   Dio _dio() {
@@ -81,39 +65,75 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
     return d;
   }
 
+  _TitleYear _explodeTitleYear(String raw) {
+    var s = raw.replaceAll(RegExp(r'\[[^\]]*\]|\([^\)]*\)|\{[^\}]*\}'), ' ');
+    s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final seps = RegExp(r'\s*[-|·•–—]\s*');
+    final tokens = s
+        .split(seps)
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    String? year;
+    if (tokens.isNotEmpty && RegExp(r'^(19|20)\d{2}$').hasMatch(tokens.last)) {
+      year = tokens.removeLast();
+    }
+    const blacklist = <String>{
+      'FR',
+      'VF',
+      'VOSTFR',
+      'TRUEFRENCH',
+      'FRENCH',
+      'MULTI',
+      'MULTILANG',
+      'EN',
+      'ENG',
+      'VO',
+      'SUBFRENCH',
+      'HD',
+      '1080P',
+      '720P',
+      '4K',
+      'HDR',
+      'WEBDL',
+      'WEB-DL',
+    };
+    final core = tokens
+        .where((t) => !blacklist.contains(t.toUpperCase()))
+        .toList();
+    final title = (core.isEmpty ? tokens : core).join(' ').trim();
+    return _TitleYear(title, year);
+  }
+
   Future<_OmdbData?> _fetchOmdb(String rawTitle) async {
     final key = settings.omdbApiKey?.trim();
     if (key == null || key.isEmpty) return null;
-
     final dio = _dio();
-    final cleaned = _cleanTitle(rawTitle);
-    final y = _extractYear(rawTitle);
-
-    // Step 1: by Title
+    final ty = _explodeTitleYear(rawTitle);
     try {
-      _dbgStep = 'by title';
-      final uri1 = Uri.https('www.omdbapi.com', '/', {
-        't': cleaned,
+      _dbgStep = 'by title+year';
+      final uri = Uri.https('www.omdbapi.com', '/', {
+        't': ty.title,
+        if (ty.year != null) 'y': ty.year!,
         'type': 'movie',
-        if (y != null) 'y': y,
         'plot': 'full',
         'r': 'json',
         'apikey': key,
       });
       setState(() {
-        _dbgUrl = uri1.toString();
+        _dbgUrl = uri.toString();
         _dbgStatus = null;
         _dbgBody = null;
         _dbgError = null;
       });
-      final r1 = await dio.getUri(uri1);
+      final r = await dio.getUri(uri);
       setState(() {
-        _dbgStatus = r1.statusCode;
-        final s = r1.data.toString();
+        _dbgStatus = r.statusCode;
+        final s = r.data.toString();
         _dbgBody = s.length > 2000 ? '${s.substring(0, 2000)}…' : s;
       });
-      if (r1.statusCode == 200 && r1.data is Map) {
-        final m = Map<String, dynamic>.from(r1.data as Map);
+      if (r.statusCode == 200 && r.data is Map) {
+        final m = Map<String, dynamic>.from(r.data as Map);
         if ((m['Response']?.toString().toLowerCase() ?? '') == 'true') {
           return _OmdbData.fromJson(m);
         }
@@ -121,73 +141,31 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
     } catch (e) {
       setState(() => _dbgError = e.toString());
     }
+    return null;
+  }
 
-    // Step 2: search by 's', then fetch by 'i'
+  Future<String?> imdbFromTitle(String rawTitle) async {
+    final key = settings.omdbApiKey?.trim();
+    if (key == null || key.isEmpty) return null;
+    final dio = _dio();
+    final ty = _explodeTitleYear(rawTitle);
     try {
-      _dbgStep = 'search';
-      final uri2 = Uri.https('www.omdbapi.com', '/', {
-        's': cleaned,
+      final uri = Uri.https('www.omdbapi.com', '/', {
+        't': ty.title,
+        if (ty.year != null) 'y': ty.year!,
         'type': 'movie',
-        if (y != null) 'y': y,
-        'page': '1',
         'r': 'json',
         'apikey': key,
       });
-      setState(() {
-        _dbgUrl = uri2.toString();
-        _dbgStatus = null;
-        _dbgBody = null;
-        _dbgError = null;
-      });
-      final r2 = await dio.getUri(uri2);
-      setState(() {
-        _dbgStatus = r2.statusCode;
-        final s = r2.data.toString();
-        _dbgBody = s.length > 2000 ? '${s.substring(0, 2000)}…' : s;
-      });
-      if (r2.statusCode == 200 && r2.data is Map) {
-        final m = Map<String, dynamic>.from(r2.data as Map);
-        final arr = (m['Search'] as List?)?.cast<Map?>() ?? const [];
-        if (arr.isNotEmpty) {
-          Map best = arr.first!;
-          // tente un match plus strict sur le titre
-          final lc = cleaned.toLowerCase();
-          for (final e in arr) {
-            final tt = (e?['Title'] ?? '').toString().toLowerCase();
-            if (tt == lc) {
-              best = e!;
-              break;
-            }
-          }
-          final imdbID = (best['imdbID'] ?? '').toString();
-          if (imdbID.isNotEmpty) {
-            _dbgStep = 'by id';
-            final uri3 = Uri.https('www.omdbapi.com', '/', {
-              'i': imdbID,
-              'plot': 'full',
-              'r': 'json',
-              'apikey': key,
-            });
-            setState(() => _dbgUrl = uri3.toString());
-            final r3 = await dio.getUri(uri3);
-            setState(() {
-              _dbgStatus = r3.statusCode;
-              final s = r3.data.toString();
-              _dbgBody = s.length > 2000 ? '${s.substring(0, 2000)}…' : s;
-            });
-            if (r3.statusCode == 200 && r3.data is Map) {
-              final m3 = Map<String, dynamic>.from(r3.data as Map);
-              if ((m3['Response']?.toString().toLowerCase() ?? '') == 'true') {
-                return _OmdbData.fromJson(m3);
-              }
-            }
-          }
+      final r = await dio.getUri(uri);
+      if (r.statusCode == 200 && r.data is Map) {
+        final m = Map<String, dynamic>.from(r.data as Map);
+        if ((m['Response']?.toString().toLowerCase() ?? '') == 'true') {
+          final id = (m['imdbID'] ?? '').toString();
+          return id.isEmpty ? null : id;
         }
       }
-    } catch (e) {
-      setState(() => _dbgError = e.toString());
-    }
-
+    } catch (_) {}
     return null;
   }
 
@@ -195,7 +173,6 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final host = _safeHost(widget.item.streamUrl);
-
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -288,9 +265,7 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
               );
             },
           ),
-
           const SizedBox(height: 12),
-
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -299,9 +274,7 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
               _Chip(text: host),
             ],
           ),
-
           const SizedBox(height: 12),
-
           FutureBuilder<_OmdbData?>(
             future: _omdbFuture,
             builder: (context, snap) {
@@ -324,7 +297,7 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Text(
-                          'OMDb indisponible. Ajouter OMDb API Key dans Settings.',
+                          'OMDb unavailable. Set OMDb API Key in Settings.',
                         ),
                       ),
                     if (_showDebug)
@@ -354,9 +327,7 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
               );
             },
           ),
-
           const SizedBox(height: 12),
-
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(10),
@@ -372,9 +343,7 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
               ),
             ),
           ),
-
           const SizedBox(height: 16),
-
           LayoutBuilder(
             builder: (c, bc) {
               final narrow = bc.maxWidth < 420;
@@ -682,4 +651,10 @@ class _DebugBlock extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TitleYear {
+  final String title;
+  final String? year;
+  const _TitleYear(this.title, this.year);
 }
