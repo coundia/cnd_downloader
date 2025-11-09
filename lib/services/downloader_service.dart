@@ -98,24 +98,51 @@ class DownloaderService {
           p.contentDisposition,
           p.finalUrl,
         );
-        final candidate = _isPlausibleFileName(nameFromHeaders)
+        var candidate = _isPlausibleFileName(nameFromHeaders)
             ? nameFromHeaders
             : t.fileName;
-        final newName = _ensureExtension(candidate, p.finalUrl);
+        candidate = _sanitizeFileName(candidate);
+        candidate = _ensureExtension(candidate, p.finalUrl);
+
         final dir = File(t.savePath).parent.path;
+        final unique = _dedupeNameInDir(dir, candidate);
+
+        final oldTemp = t.tempPath;
+        final oldSave = t.savePath;
 
         t.url = p.finalUrl.toString();
-        t.fileName = newName;
-        t.savePath = '$dir/$newName';
-        t.tempPath = '$dir/$newName.part';
+        t.fileName = unique;
+        t.savePath = '$dir/$unique';
+        t.tempPath = '$dir/$unique.part';
         t.total = p.total ?? 0;
         t.acceptRanges = p.acceptRanges;
+
+        if (oldTemp != t.tempPath) {
+          try {
+            final f = File(oldTemp);
+            if (await f.exists()) {
+              await f.rename(t.tempPath);
+              await _repo.addLog(t.id, 'info', 'moved part to ${t.tempPath}');
+            }
+          } catch (e) {
+            await _repo.addLog(t.id, 'warn', 'move part failed: $e');
+          }
+        }
+        if (oldSave != t.savePath) {
+          try {
+            final f = File(oldSave);
+            if (await f.exists() && oldSave != t.tempPath) {
+              final b = await f.length();
+              await _repo.addLog(t.id, 'warn', 'old save file ignored size=$b');
+            }
+          } catch (_) {}
+        }
 
         await _repo.upsertTask(t);
         await _repo.addLog(
           t.id,
           'info',
-          'probe ok total=${t.total} acceptRanges=${t.acceptRanges}',
+          'probe ok total=${t.total} acceptRanges=${t.acceptRanges} name=${t.fileName}',
         );
         return true;
       } catch (e) {
@@ -756,6 +783,24 @@ class DownloaderService {
     final m = RegExp(r'\.([a-zA-Z0-9]{2,5})(?:$|\?)').firstMatch(finalUrl.path);
     final ext = m != null ? m.group(1) : 'mp4';
     return '$name.$ext';
+  }
+
+  String _dedupeNameInDir(String dir, String name) {
+    var candidate = name;
+    var i = 1;
+    while (File('$dir/$candidate').existsSync() ||
+        File('$dir/$candidate.part').existsSync()) {
+      final parts = _splitNameExt(candidate);
+      candidate = '${parts[0]} ($i)${parts[1]}';
+      i++;
+    }
+    return candidate;
+  }
+
+  List<String> _splitNameExt(String name) {
+    final idx = name.lastIndexOf('.');
+    if (idx <= 0) return [name, ''];
+    return [name.substring(0, idx), name.substring(idx)];
   }
 
   Future<void> verify(int taskId) async {
