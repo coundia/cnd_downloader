@@ -1,5 +1,6 @@
 // lib/ui/widgets/cnd_video_player.dart
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:pip_view/pip_view.dart';
@@ -599,6 +600,16 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                         iconSize: 22,
+                        onPressed: _showDebug,
+                        icon: const Icon(Icons.bug_report, color: Colors.white),
+                        tooltip: 'Debug',
+                      ),
+
+                      const SizedBox(width: 4),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        iconSize: 22,
                         onPressed: _replay,
                         icon: const Icon(Icons.replay, color: Colors.white),
                         tooltip: 'Rejouer',
@@ -728,12 +739,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                         color: Colors.black54,
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(
-                        live ? 'LIVE' : 'VOD',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.labelSmall?.copyWith(color: Colors.white),
-                      ),
                     ),
                   ),
                   if (_show && !isFloating)
@@ -753,6 +758,53 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
           ),
         );
       },
+    );
+  }
+
+  void _showDebug() {
+    final c = _c;
+    final v = c?.value;
+    final buffered = (v == null || v.buffered.isEmpty)
+        ? null
+        : v.buffered.last.end.inMilliseconds;
+
+    final data = {
+      'url': widget.url,
+      'headers': widget.headers ?? const <String, String>{},
+      'initialized': v?.isInitialized ?? false,
+      'playing': v?.isPlaying ?? false,
+      'buffering': v?.isBuffering ?? false,
+      'live': (v?.duration ?? Duration.zero) == Duration.zero,
+      'positionMs': v?.position.inMilliseconds,
+      'durationMs': v?.duration.inMilliseconds,
+      'bufferedEndMs': buffered,
+      'size': v?.size.toString(),
+      'volume': v?.volume,
+      'speed': _speeds[_speedIx],
+      'aspectRatio': v?.aspectRatio,
+      'retrying': _restarting,
+      'retryAttempts': _retryAttempts,
+      'stallThresholdSec': _stallThresholdSec,
+      'lastAdvanceAgoSec': DateTime.now().difference(_lastAdvance).inSeconds,
+    };
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black87,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        builder: (_, ctrl) => Container(
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
+            controller: ctrl,
+            child: SelectableText(
+              const JsonEncoder.withIndent('  ').convert(data),
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
