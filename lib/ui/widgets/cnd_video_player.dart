@@ -37,7 +37,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   DateTime _lastAdvance = DateTime.now();
   int _retry = 0;
   bool _restarting = false;
-  bool _fatalError = false; // NEW: UI state for fatal error
+  bool _fatalError = false;
 
   Duration get currentPosition => _c?.value.position ?? Duration.zero;
 
@@ -66,7 +66,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   }
 
   Future<void> _open() async {
-    // NEW: Reset all error/retry state on new open
     _retry = 0;
     _restarting = false;
     _fatalError = false;
@@ -81,7 +80,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     try {
       await c.initialize();
     } catch (_) {
-      _scheduleRetry(); // MODIFIED: Don't increment retry here
+      _scheduleRetry();
       return;
     }
     if (!mounted) return;
@@ -104,10 +103,11 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         _lastAdvance = DateTime.now();
       }
       if (v.hasError) {
-        // MODIFIED: Only schedule retry if not already restarting
         if (!_restarting) _scheduleRetry();
       }
-      setState(() {});
+      // (MODIFIED) On s'assure que le setState est appelé pour
+      // mettre à jour le slider de volume et le buffer
+      if (mounted) setState(() {});
     });
     _startStallWatch();
     _kickAutoHide();
@@ -131,14 +131,12 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       if (!isLive) return;
       if (!v.isInitialized) return;
       if (v.hasError) {
-        // MODIFIED
         if (!_restarting) _scheduleRetry();
         return;
       }
       if (!v.isPlaying) return;
       final stalledFor = DateTime.now().difference(_lastAdvance);
       if (stalledFor.inSeconds >= 6) {
-        // MODIFIED
         if (!_restarting) _scheduleRetry();
       }
     });
@@ -148,22 +146,19 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     if (!mounted) return;
     if (_restarting) return;
 
-    // NEW: Increment retry count *when scheduling*
     _retry++;
 
-    // NEW: Check retry limit
     if (_retry > 3) {
       setState(() {
         _fatalError = true;
         _restarting = false;
       });
-      _disposeCtrl(); // Stop the player
+      _disposeCtrl();
       return;
     }
 
     _restarting = true;
     _retryT?.cancel();
-    // Use exponential backoff: 1s, 2s, 4s
     final backoffSeconds = 1 << (_retry - 1);
     _retryT = Timer(Duration(seconds: backoffSeconds), () async {
       if (!mounted) return;
@@ -201,7 +196,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     try {
       await c.initialize();
     } catch (_) {
-      // MODIFIED: Just schedule next retry, don't increment here
       _restarting = false;
       _scheduleRetry();
       return;
@@ -219,7 +213,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         await c.play();
       } catch (_) {}
     }
-    _retry = 0; // NEW: Reset retry count on SUCCESS
+    _retry = 0;
     _restarting = false;
     _lastPos = c.value.position;
     _lastAdvance = DateTime.now();
@@ -234,7 +228,8 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       if (v.hasError) {
         if (!_restarting) _scheduleRetry();
       }
-      setState(() {});
+      // (MODIFIED)
+      if (mounted) setState(() {});
     });
     _startStallWatch();
     _kickAutoHide();
@@ -243,13 +238,16 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
 
   Future<void> _replay() async {
     final v = _c?.value;
-    if (v == null) return;
+    if (v == null) {
+      // (NEW) Si la fatal error a eu lieu, _c est null
+      _open(); // Tente de rouvrir
+      return;
+    }
 
-    // NEW: Reset error state on manual replay
     _retry = 0;
     _restarting = false;
     _fatalError = false;
-    if (mounted) setState(() {}); // Update UI to remove error
+    if (mounted) setState(() {});
 
     final isVod = v.duration != Duration.zero;
     await _restartStream(fromStart: isVod);
@@ -343,7 +341,8 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     } else {
       await c.setVolume(_lastVol <= 0 ? 1.0 : _lastVol);
     }
-    setState(() {});
+    // (MODIFIED) Le listener s'en occupe
+    // setState(() {});
   }
 
   void _cycleSpeed() async {
@@ -351,12 +350,12 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     if (c == null) return;
     _speedIx = (_speedIx + 1) % _speeds.length;
     await c.setPlaybackSpeed(_speeds[_speedIx]);
-    setState(() {});
+    // (MODIFIED) Le listener s'en occupe
+    // setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    // NEW: Handle fatal error state
     if (_fatalError) {
       return AspectRatio(
         aspectRatio: 16 / 9,
@@ -384,7 +383,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
               ElevatedButton.icon(
                 icon: const Icon(Icons.replay),
                 label: const Text('Réessayer'),
-                onPressed: _replay, // Use the replay function to retry
+                onPressed: _replay,
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
                   backgroundColor: Colors.white24,
@@ -407,7 +406,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         ),
       );
     }
-
     final v = c.value;
     final dur = v.duration;
     final pos = v.position;
@@ -417,6 +415,13 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         : (dur.inMilliseconds == 0
               ? 0.0
               : pos.inMilliseconds / dur.inMilliseconds.clamp(1, 1 << 31));
+
+    // (NEW) Calcul du buffer
+    final buffered = v.buffered.isEmpty ? Duration.zero : v.buffered.last.end;
+    final bufferRatio = (dur == Duration.zero || dur.inMilliseconds == 0)
+        ? 0.0
+        : buffered.inMilliseconds / dur.inMilliseconds;
+
     final controls = FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.bottomCenter,
@@ -428,22 +433,44 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (!live)
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 2.5,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 6,
+                // (MODIFIED) Stack pour superposer la barre de buffer
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // (NEW) Barre de progression du buffer
+                    LinearProgressIndicator(
+                      value: bufferRatio.clamp(0.0, 1.0),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.white54,
+                      ),
+                      backgroundColor: Colors.white24,
+                      minHeight: 2.5, // Doit correspondre au trackHeight
                     ),
-                  ),
-                  child: Slider(
-                    value: ratio.clamp(0.0, 1.0),
-                    onChanged: (v) {
-                      final ms = (dur.inMilliseconds * v).toInt();
-                      c.seekTo(Duration(milliseconds: ms));
-                    },
-                    activeColor: Colors.white,
-                    inactiveColor: Colors.white24,
-                  ),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 2.5,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 6,
+                        ),
+                        // (NEW) Permet au slider de dessiner par-dessus
+                        trackShape: const RectangularSliderTrackShape(),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 12,
+                        ),
+                        activeTrackColor: Colors.white,
+                        // (MODIFIED) Rendu transparent pour voir le LinearProgressIndicator
+                        inactiveTrackColor: Colors.transparent,
+                        thumbColor: Colors.white,
+                      ),
+                      child: Slider(
+                        value: ratio.clamp(0.0, 1.0),
+                        onChanged: (v) {
+                          final ms = (dur.inMilliseconds * v).toInt();
+                          c.seekTo(Duration(milliseconds: ms));
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               Row(
                 children: [
@@ -508,7 +535,37 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                     ),
                     tooltip: v.volume > 0 ? 'Mute' : 'Unmute',
                   ),
-                  const SizedBox(width: 4),
+                  // (NEW) Slider de volume
+                  SizedBox(
+                    width: 80,
+                    height: 24,
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 2.0,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 6,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 12,
+                        ),
+                        activeTrackColor: Colors.white,
+                        inactiveTrackColor: Colors.white24,
+                        thumbColor: Colors.white,
+                        overlayColor: Colors.white.withOpacity(0.3),
+                      ),
+                      child: Slider(
+                        value: v.volume,
+                        min: 0.0,
+                        max: 1.0,
+                        onChanged: (vol) {
+                          c.setVolume(vol);
+                          if (vol > 0) _lastVol = vol;
+                        },
+                      ),
+                    ),
+                  ),
+                  // (MODIFIED) Réduction de l'espace
+                  const SizedBox(width: 2),
                   TextButton(
                     onPressed: _cycleSpeed,
                     child: Text(
@@ -567,8 +624,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
             fit: StackFit.expand,
             children: [
               VideoPlayer(c),
-
-              // NEW: Separate UI for buffering vs restarting
               if (v.isBuffering && !_restarting)
                 const Center(
                   child: SizedBox(
@@ -580,7 +635,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                     ),
                   ),
                 ),
-              // NEW: UI for restarting
               if (_restarting)
                 Container(
                   color: Colors.black54,
@@ -597,7 +651,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                     ],
                   ),
                 ),
-
               Positioned(
                 left: 8,
                 top: 8,
@@ -609,6 +662,12 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                   decoration: BoxDecoration(
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    (v.duration == Duration.zero) ? 'LIVE' : 'VOD',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: Colors.white),
                   ),
                 ),
               ),
