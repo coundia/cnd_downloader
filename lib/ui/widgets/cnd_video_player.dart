@@ -27,9 +27,15 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   VideoPlayerController? _c;
   bool _show = true;
   Timer? _hideT;
+  Timer? _stallT;
+  Timer? _retryT;
   double _lastVol = 1.0;
   final List<double> _speeds = const [0.5, 1.0, 1.25, 1.5, 2.0];
   int _speedIx = 1;
+  Duration _lastPos = Duration.zero;
+  DateTime _lastAdvance = DateTime.now();
+  int _retry = 0;
+  bool _restarting = false;
 
   Duration get currentPosition => _c?.value.position ?? Duration.zero;
 
@@ -51,6 +57,8 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   @override
   void dispose() {
     _hideT?.cancel();
+    _stallT?.cancel();
+    _retryT?.cancel();
     _disposeCtrl();
     super.dispose();
   }
@@ -62,18 +70,35 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
     _c = c;
-    await c.initialize();
+    try {
+      await c.initialize();
+    } catch (_) {
+      _scheduleRetry();
+      return;
+    }
     if (!mounted) return;
-    if ((widget.startAt ?? Duration.zero) > Duration.zero) {
+    if ((widget.startAt ?? Duration.zero) > Duration.zero &&
+        c.value.duration != Duration.zero) {
       await c.seekTo(widget.startAt!);
     }
+    _lastVol = _lastVol <= 0 ? 1.0 : _lastVol;
     await c.setVolume(_lastVol);
     await c.setPlaybackSpeed(_speeds[_speedIx]);
     if (widget.autoPlay) await c.play();
+    _lastPos = c.value.position;
+    _lastAdvance = DateTime.now();
     c.addListener(() {
       if (!mounted) return;
+      final v = c.value;
+      if (v.volume >= 0) _lastVol = v.volume;
+      if (v.position > _lastPos) {
+        _lastPos = v.position;
+        _lastAdvance = DateTime.now();
+      }
+      if (v.hasError) _scheduleRetry();
       setState(() {});
     });
+    _startStallWatch();
     _kickAutoHide();
     setState(() {});
   }
@@ -81,7 +106,109 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   void _disposeCtrl() {
     final c = _c;
     _c = null;
+    c?.removeListener(() {});
     c?.dispose();
+  }
+
+  void _startStallWatch() {
+    _stallT?.cancel();
+    _stallT = Timer.periodic(const Duration(seconds: 1), (_) {
+      final c = _c;
+      if (c == null) return;
+      final v = c.value;
+      final isLive = v.duration == Duration.zero;
+      if (!isLive) return;
+      if (!v.isInitialized) return;
+      if (v.hasError) {
+        _scheduleRetry();
+        return;
+      }
+      if (!v.isPlaying) return;
+      final stalledFor = DateTime.now().difference(_lastAdvance);
+      if (stalledFor.inSeconds >= 6) {
+        _scheduleRetry();
+      }
+    });
+  }
+
+  void _scheduleRetry() {
+    if (!mounted) return;
+    if (_restarting) return;
+    _restarting = true;
+    _retryT?.cancel();
+    final backoff = 1 << (_retry > 5 ? 5 : _retry);
+    _retryT = Timer(Duration(seconds: backoff), () async {
+      if (!mounted) return;
+      await _restartStream();
+    });
+    setState(() {});
+  }
+
+  Future<void> _restartStream() async {
+    final old = _c;
+    if (old == null) return;
+    final wasPlaying = old.value.isPlaying;
+    final isLive = old.value.duration == Duration.zero;
+    final resume = old.value.position;
+    final spd = _speeds[_speedIx];
+    final vol = old.value.volume;
+    _stallT?.cancel();
+    _hideT?.cancel();
+    try {
+      await old.pause();
+    } catch (_) {}
+    _disposeCtrl();
+
+    final base = Uri.parse(widget.url);
+    final qp = Map<String, String>.from(base.queryParameters);
+    qp['r'] = DateTime.now().millisecondsSinceEpoch.toString();
+    final uri = base.replace(queryParameters: qp);
+
+    final c = VideoPlayerController.networkUrl(
+      uri,
+      httpHeaders: widget.headers ?? const <String, String>{},
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
+    _c = c;
+    try {
+      await c.initialize();
+    } catch (_) {
+      _retry++;
+      _restarting = false;
+      _scheduleRetry();
+      return;
+    }
+    if (!mounted) return;
+    if (!isLive && resume > Duration.zero) {
+      try {
+        await c.seekTo(resume);
+      } catch (_) {}
+    }
+    await c.setPlaybackSpeed(spd);
+    await c.setVolume(vol <= 0 ? _lastVol : vol);
+    if (wasPlaying || widget.autoPlay) {
+      try {
+        await c.play();
+      } catch (_) {}
+    }
+    _retry = 0;
+    _restarting = false;
+    _lastPos = c.value.position;
+    _lastAdvance = DateTime.now();
+    c.addListener(() {
+      if (!mounted) return;
+      final v = c.value;
+      if (v.volume >= 0) _lastVol = v.volume;
+      if (v.position > _lastPos) {
+        _lastPos = v.position;
+        _lastAdvance = DateTime.now();
+      }
+      if (v.hasError) _scheduleRetry();
+      setState(() {});
+    });
+    _startStallWatch();
+    _kickAutoHide();
+    setState(() {});
   }
 
   void _toggleControls() {
@@ -187,9 +314,13 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   Widget build(BuildContext context) {
     final c = _c;
     if (c == null || !c.value.isInitialized) {
-      return const AspectRatio(
+      return AspectRatio(
         aspectRatio: 16 / 9,
-        child: Center(child: CircularProgressIndicator()),
+        child: Container(
+          color: Colors.black,
+          alignment: Alignment.center,
+          child: const CircularProgressIndicator(),
+        ),
       );
     }
     final v = c.value;
@@ -322,64 +453,70 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     final aspect = v.aspectRatio == 0 ? (16 / 9) : v.aspectRatio;
     return AspectRatio(
       aspectRatio: aspect,
-      child: GestureDetector(
-        onTap: _toggleControls,
-        onDoubleTapDown: (d) {
-          final w = MediaQuery.of(context).size.width;
-          final x = d.globalPosition.dx;
-          if (x < w * 0.5) {
-            _seekBy(const Duration(seconds: -10));
-          } else {
-            _seekBy(const Duration(seconds: 10));
-          }
-          _show = true;
-          _kickAutoHide();
-          setState(() {});
-        },
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            VideoPlayer(c),
-            if (v.isBuffering)
-              const Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+      child: Container(
+        color: Colors.black,
+        child: GestureDetector(
+          onTap: _toggleControls,
+          onDoubleTapDown: (d) {
+            final w = MediaQuery.of(context).size.width;
+            final x = d.globalPosition.dx;
+            if (x < w * 0.5) {
+              _seekBy(const Duration(seconds: -10));
+            } else {
+              _seekBy(const Duration(seconds: 10));
+            }
+            _show = true;
+            _kickAutoHide();
+            setState(() {});
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              VideoPlayer(c),
+              if (v.isBuffering || _restarting)
+                const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              Positioned(
+                left: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    (v.duration == Duration.zero) ? 'LIVE' : 'VOD',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelSmall?.copyWith(color: Colors.white),
                   ),
                 ),
               ),
-            Positioned(
-              left: 8,
-              top: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(6),
+              if (_show)
+                Positioned(
+                  left: 8,
+                  right: 8,
+                  bottom: 8,
+                  child: Material(
+                    color: Colors.black.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(8),
+                    child: controls,
+                  ),
                 ),
-                child: Text(
-                  (v.duration == Duration.zero) ? 'LIVE' : 'VOD',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(color: Colors.white),
-                ),
-              ),
-            ),
-            if (_show)
-              Positioned(
-                left: 8,
-                right: 8,
-                bottom: 8,
-                child: Material(
-                  color: Colors.black.withOpacity(0.35),
-                  borderRadius: BorderRadius.circular(8),
-                  child: controls,
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

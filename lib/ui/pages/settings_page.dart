@@ -54,17 +54,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final vm = ref.read(settingsVmProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(
-        actions: [
-          IconButton(
-            tooltip: 'Home',
-            icon: const Icon(Icons.home),
-            onPressed: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            },
-          ),
-        ],
-      ),
       body: AbsorbPointer(
         absorbing: _saving,
         child: ListView(

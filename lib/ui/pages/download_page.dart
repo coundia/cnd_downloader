@@ -187,7 +187,7 @@ class _BottomStats extends ConsumerWidget {
                   }
                 },
                 icon: const Icon(Icons.play_arrow),
-                label: const Text('Tout démarrer'),
+                label: const Text(''),
               ),
               OutlinedButton.icon(
                 onPressed: () async {
@@ -199,7 +199,7 @@ class _BottomStats extends ConsumerWidget {
                   }
                 },
                 icon: const Icon(Icons.pause),
-                label: const Text('Tout mettre en pause'),
+                label: const Text(''),
               ),
               OutlinedButton.icon(
                 onPressed: () async {
@@ -209,7 +209,7 @@ class _BottomStats extends ConsumerWidget {
                   }
                 },
                 icon: const Icon(Icons.restart_alt),
-                label: const Text('Relancer les erreurs'),
+                label: const Text(''),
               ),
             ],
           ),
