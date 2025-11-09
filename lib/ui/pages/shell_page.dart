@@ -8,6 +8,7 @@ import 'series_page.dart';
 import 'settings_page.dart';
 import '../sources/sources_page.dart';
 import '../sources/source_form_page.dart';
+import 'about_page.dart';
 
 class ShellPage extends ConsumerStatefulWidget {
   const ShellPage({super.key});
@@ -19,20 +20,21 @@ class _ShellPageState extends ConsumerState<ShellPage> {
   final bucket = PageStorageBucket();
   int index = 0;
 
-  // Index mapping
   static const int tvIdx = 0;
   static const int moviesIdx = 1;
   static const int seriesIdx = 2;
-  static const int sourcesIdx = 3; // new
+  static const int sourcesIdx = 3;
   static const int downloadsIdx = 4;
-  static const int settingsIdx = 5;
+  static const int aboutIdx = 5;
+  static const int settingsIdx = 6;
 
   static const _titles = [
     'TV',
     'Movies',
     'Series',
-    'Sources', // new
+    'Sources',
     'Downloads',
+    'About',
     'Settings',
   ];
 
@@ -40,8 +42,9 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     TvPage(key: PageStorageKey('tv')),
     MoviesPage(key: PageStorageKey('movies')),
     SeriesPage(key: PageStorageKey('series')),
-    SourcesPage(key: PageStorageKey('sources')), // new
+    SourcesPage(key: PageStorageKey('sources')),
     HomePage(key: PageStorageKey('downloads')),
+    AboutPage(key: PageStorageKey('about')),
     SettingsPage(key: PageStorageKey('settings')),
   ];
 
@@ -88,13 +91,16 @@ class _ShellPageState extends ConsumerState<ShellPage> {
                       label: Text('Series'),
                     ),
                     NavigationRailDestination(
-                      // new
                       icon: Icon(Icons.playlist_play),
                       label: Text('Sources'),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.download),
                       label: Text('Downloads'),
+                    ),
+                    NavigationRailDestination(
+                      icon: Icon(Icons.info_outline),
+                      label: Text('About'),
                     ),
                     NavigationRailDestination(
                       icon: Icon(Icons.settings),
@@ -134,13 +140,16 @@ class _ShellPageState extends ConsumerState<ShellPage> {
                 label: 'Series',
               ),
               NavigationDestination(
-                // new
                 icon: Icon(Icons.playlist_play),
                 label: 'Sources',
               ),
               NavigationDestination(
                 icon: Icon(Icons.download),
                 label: 'Downloads',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.info_outline),
+                label: 'About',
               ),
               NavigationDestination(
                 icon: Icon(Icons.settings),
