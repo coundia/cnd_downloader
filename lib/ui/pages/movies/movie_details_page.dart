@@ -396,7 +396,11 @@ class _MovieDetailsPageState extends ConsumerState<MovieDetailsPage> {
                     final dir = await defaultDownloadDir();
                     await ref
                         .read(listVmProvider.notifier)
-                        .addOnly(widget.item.streamUrl, dir);
+                        .addOnly(
+                          widget.item.streamUrl,
+                          dir,
+                          fileName: widget.item.name,
+                        );
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Queued to Downloads')),

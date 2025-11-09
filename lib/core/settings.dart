@@ -15,7 +15,7 @@ class RuntimeSettings {
   RuntimeSettings({
     this.segmentsPerFile = 1,
     this.partSizeBytes = 10 * 1024 * 1024,
-    this.maxActiveFiles = 2,
+    this.maxActiveFiles = 1,
     this.defaultUserAgent = 'VLC/3.0.21 LibVLC/3.0.21',
     this.defaultReferer,
     this.downloadDir,

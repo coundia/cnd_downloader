@@ -1,14 +1,18 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/iptv_models.dart';
 import '../../core/settings.dart';
+import '../../core/paths.dart';
+import '../../viewmodels/download_list_vm.dart';
 import '../widgets/cnd_video_player.dart';
 import 'episodePlay.dart';
 import 'playlist_player_page.dart';
 
-class SeriesDetailsPage extends StatefulWidget {
+class SeriesDetailsPage extends ConsumerStatefulWidget {
   final String seriesKey;
-  final List<IptvItem> episodes; // déjà triés S/E par l’appelant
+  final List<IptvItem> episodes;
   const SeriesDetailsPage({
     super.key,
     required this.seriesKey,
@@ -16,10 +20,10 @@ class SeriesDetailsPage extends StatefulWidget {
   });
 
   @override
-  State<SeriesDetailsPage> createState() => _SeriesDetailsPageState();
+  ConsumerState<SeriesDetailsPage> createState() => _SeriesDetailsPageState();
 }
 
-class _SeriesDetailsPageState extends State<SeriesDetailsPage>
+class _SeriesDetailsPageState extends ConsumerState<SeriesDetailsPage>
     with SingleTickerProviderStateMixin {
   late final Map<int, List<IptvItem>> _bySeason;
   late final List<int> _seasons;
@@ -76,11 +80,11 @@ class _SeriesDetailsPageState extends State<SeriesDetailsPage>
     final ua = (it.userAgent ?? '').trim().isNotEmpty
         ? it.userAgent!.trim()
         : settings.defaultUserAgent.trim();
-    if (ua.isNotEmpty) map['user-agent'] = ua;
-    final ref = (it.referer ?? '').trim().isNotEmpty
+    if (ua.isNotEmpty) map['User-Agent'] = ua;
+    final refh = (it.referer ?? '').trim().isNotEmpty
         ? it.referer!.trim()
         : (settings.defaultReferer ?? '').trim();
-    if (ref.isNotEmpty) map['referer'] = ref;
+    if (refh.isNotEmpty) map['Referer'] = refh;
     final hj = (it.headersJson ?? '').trim();
     if (hj.isNotEmpty) {
       try {
@@ -154,6 +158,162 @@ class _SeriesDetailsPageState extends State<SeriesDetailsPage>
     );
   }
 
+  String _ffHeadersArg(Map<String, String> h) {
+    if (h.isEmpty) return '';
+    final buf = StringBuffer();
+    var first = true;
+    h.forEach((k, v) {
+      if (!first) buf.write(r'\r\n');
+      buf.write('$k: $v');
+      first = false;
+    });
+    return "-headers '${buf.toString()}'";
+  }
+
+  String _safeFileName(String raw) {
+    final s = raw
+        .replaceAll(RegExp(r'[\/\\:*?"<>|]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return s.isEmpty ? 'video' : s;
+  }
+
+  String _ffmpegCmd({
+    required String title,
+    required String url,
+    required Map<String, String> headers,
+    String ext = 'mp4',
+  }) {
+    final hdr = _ffHeadersArg(headers);
+    final file = _safeFileName(title);
+    final hArg = hdr.isEmpty ? '' : '$hdr ';
+    return "ffmpeg -hide_banner -loglevel error ${hArg}-i \"$url\" -c copy \"$file.$ext\"";
+  }
+
+  Future<void> _copy(String text, String msg) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _enqueueEpisode(IptvItem it) async {
+    final url = (it.realUrl ?? '').isNotEmpty ? it.realUrl! : it.streamUrl;
+    final dir = await defaultDownloadDir();
+    final h = _headersFor(it);
+    await ref
+        .read(listVmProvider.notifier)
+        .addOnly(
+          url,
+          dir,
+          referer: h['Referer'],
+          userAgent: h['User-Agent'],
+          fileName: it.name,
+        );
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Ajouté aux téléchargements')));
+  }
+
+  Future<void> _enqueueSeason(int seasonIndex) async {
+    final season = _seasons[seasonIndex];
+    final eps = _bySeason[season]!;
+    final dir = await defaultDownloadDir();
+    for (final it in eps) {
+      final url = (it.realUrl ?? '').isNotEmpty ? it.realUrl! : it.streamUrl;
+      final h = _headersFor(it);
+      await ref
+          .read(listVmProvider.notifier)
+          .addOnly(
+            url,
+            dir,
+            referer: h['Referer'],
+            userAgent: h['User-Agent'],
+            fileName: it.name,
+          );
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('S$season ajoutée aux téléchargements')),
+    );
+  }
+
+  Future<void> _enqueueSeries() async {
+    final dir = await defaultDownloadDir();
+    for (final it in widget.episodes) {
+      final url = (it.realUrl ?? '').isNotEmpty ? it.realUrl! : it.streamUrl;
+      final h = _headersFor(it);
+      await ref
+          .read(listVmProvider.notifier)
+          .addOnly(
+            url,
+            dir,
+            referer: h['Referer'],
+            userAgent: h['User-Agent'],
+            fileName: it.name,
+          );
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Série ajoutée aux téléchargements')),
+    );
+  }
+
+  void _copyEpisodeCmd(IptvItem it) {
+    final url = (it.realUrl ?? '').isNotEmpty ? it.realUrl! : it.streamUrl;
+    final cmd = _ffmpegCmd(title: it.name, url: url, headers: _headersFor(it));
+    _copy(cmd, 'Commande ffmpeg copiée');
+  }
+
+  void _copySeasonCmd(int seasonIndex) {
+    final season = _seasons[seasonIndex];
+    final eps = _bySeason[season]!;
+    final lines = eps
+        .map((it) {
+          final url = (it.realUrl ?? '').isNotEmpty
+              ? it.realUrl!
+              : it.streamUrl;
+          return _ffmpegCmd(title: it.name, url: url, headers: _headersFor(it));
+        })
+        .join('\n');
+    _showCommandsDialog(title: 'Télécharger S$season', commands: lines);
+  }
+
+  void _copySeriesCmd() {
+    final lines = widget.episodes
+        .map((it) {
+          final url = (it.realUrl ?? '').isNotEmpty
+              ? it.realUrl!
+              : it.streamUrl;
+          return _ffmpegCmd(title: it.name, url: url, headers: _headersFor(it));
+        })
+        .join('\n');
+    _showCommandsDialog(title: 'Télécharger toute la série', commands: lines);
+  }
+
+  void _showCommandsDialog({required String title, required String commands}) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: 600,
+          child: SingleChildScrollView(child: SelectableText(commands)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => _copy(commands, 'Commandes copiées'),
+            child: const Text('Tout copier'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final poster = widget.episodes.firstWhere(
@@ -169,6 +329,16 @@ class _SeriesDetailsPageState extends State<SeriesDetailsPage>
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          IconButton(
+            tooltip: 'Télécharger la série',
+            onPressed: _enqueueSeries,
+            icon: const Icon(Icons.download),
+          ),
+          IconButton(
+            tooltip: 'Copier commandes série',
+            onPressed: _copySeriesCmd,
+            icon: const Icon(Icons.copy_all),
+          ),
           TextButton.icon(
             onPressed: _playAllSeries,
             icon: const Icon(Icons.play_arrow),
@@ -196,6 +366,15 @@ class _SeriesDetailsPageState extends State<SeriesDetailsPage>
                             const ColoredBox(color: Color(0xFF111111)),
                       )
                     : const ColoredBox(color: Color(0xFF111111)),
+                Positioned(
+                  left: 12,
+                  bottom: 12,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => _enqueueSeason(_tabs.index),
+                    icon: const Icon(Icons.download),
+                    label: const Text('DL saison'),
+                  ),
+                ),
                 Positioned(
                   right: 12,
                   bottom: 12,
@@ -229,9 +408,25 @@ class _SeriesDetailsPageState extends State<SeriesDetailsPage>
                         overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text(it.groupTitle ?? ''),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.play_circle),
-                        onPressed: () => _openSingle(it),
+                      trailing: Wrap(
+                        spacing: 6,
+                        children: [
+                          IconButton(
+                            tooltip: 'Télécharger',
+                            icon: const Icon(Icons.download),
+                            onPressed: () => _enqueueEpisode(it),
+                          ),
+                          IconButton(
+                            tooltip: 'Copier commande',
+                            icon: const Icon(Icons.file_copy),
+                            onPressed: () => _copyEpisodeCmd(it),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.play_circle),
+                            tooltip: 'Lire',
+                            onPressed: () => _openSingle(it),
+                          ),
+                        ],
                       ),
                       onTap: () => _openSingle(it),
                     );

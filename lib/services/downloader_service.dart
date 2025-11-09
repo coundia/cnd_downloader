@@ -50,6 +50,7 @@ class DownloaderService {
     String dir, {
     String? referer,
     String? userAgent,
+    String? fileName,
   }) async {
     try {
       final d = Directory(dir);
@@ -57,14 +58,18 @@ class DownloaderService {
         await d.create(recursive: true);
       }
     } catch (_) {}
-    final name = _fileNameFromUrl(url);
+
+    final base = (fileName?.trim().isNotEmpty ?? false)
+        ? _sanitizeFileName(fileName!.trim())
+        : _sanitizeFileName(_fileNameFromUrl(url));
+
     final t = DownloadTask()
       ..url = url
       ..referer = referer ?? settings.defaultReferer
       ..userAgent = userAgent ?? settings.defaultUserAgent
-      ..fileName = name
-      ..savePath = '$dir/$name'
-      ..tempPath = '$dir/$name.part'
+      ..fileName = base
+      ..savePath = '$dir/$base'
+      ..tempPath = '$dir/$base.part'
       ..total = 0
       ..acceptRanges = false
       ..state = 'queued';
@@ -88,13 +93,15 @@ class DownloaderService {
           referer: t.referer,
           userAgent: t.userAgent,
         );
+
         final nameFromHeaders = prober.resolveFileName(
           p.contentDisposition,
           p.finalUrl,
         );
-        final newName = nameFromHeaders.isNotEmpty
+        final candidate = _isPlausibleFileName(nameFromHeaders)
             ? nameFromHeaders
             : t.fileName;
+        final newName = _ensureExtension(candidate, p.finalUrl);
         final dir = File(t.savePath).parent.path;
 
         t.url = p.finalUrl.toString();
@@ -304,7 +311,6 @@ class DownloaderService {
     }
   }
 
-  // Reprise robuste: Range + backoff + pas de troncature.
   Future<void> _single(DownloadTask task) async {
     task.state = 'running';
     await _repo.upsertTask(task);
@@ -318,7 +324,6 @@ class DownloaderService {
       await tmpFile.create(recursive: true);
     }
 
-    // Aligne l’état avec le disque
     if (downloaded != task.downloaded) {
       task.downloaded = downloaded;
       await _repo.upsertTask(task);
@@ -332,11 +337,9 @@ class DownloaderService {
 
     try {
       while (true) {
-        // Pause/stop: un nouveau token par tentative
         final token = CancelToken();
         _tokens[task.id] = [token];
 
-        // En-têtes
         final headers = <String, String>{
           'accept-encoding': 'identity',
           'connection': 'keep-alive',
@@ -344,7 +347,6 @@ class DownloaderService {
           if (task.userAgent != null) 'user-agent': task.userAgent!,
         };
 
-        // Reprise si possible
         if (downloaded > 0) {
           headers['range'] = 'bytes=$downloaded-';
         }
@@ -391,10 +393,7 @@ class DownloaderService {
           'GET ${resp.realUri} status=$status',
         );
 
-        // Déduire la taille totale
-        final contentRange = resp.headers.value(
-          'content-range',
-        ); // ex: bytes 200-999/1000
+        final contentRange = resp.headers.value('content-range');
         if (contentRange != null) {
           final m = RegExp(r'/(\d+)$').firstMatch(contentRange);
           final tot = m != null ? int.tryParse(m.group(1)!) : null;
@@ -408,7 +407,6 @@ class DownloaderService {
             task.total = cl;
             await _repo.upsertTask(task);
           }
-          // Si on a demandé une reprise mais le serveur ignore Range → repartir de 0
           if (downloaded > 0) {
             await _repo.addLog(
               task.id,
@@ -423,7 +421,6 @@ class DownloaderService {
           }
         }
 
-        // Lecture flux
         int readThisAttempt = 0;
         final stream = resp.data!.stream;
         final t0 = DateTime.now();
@@ -444,7 +441,6 @@ class DownloaderService {
             await _repo.addLog(task.id, 'info', 'cancelled');
             return;
           }
-          // Erreur de corps: on retente depuis "downloaded"
           attempt++;
           final delay = Duration(seconds: min(8, 1 << attempt));
           await _repo.addLog(
@@ -459,20 +455,15 @@ class DownloaderService {
             await _repo.addLog(task.id, 'error', 'max retries reached');
             return;
           }
-          // boucle → nouvelle requête Range=downloaded-
           continue;
         }
 
-        // Fin d’une tentative sans exception
-        attempt = 0; // on reset le compteur car progrès OK
+        attempt = 0;
 
-        // Terminé ?
         if (task.total > 0 && downloaded >= task.total) {
           break;
         }
 
-        // Si pas de total connu, on tente de repartir jusqu’à ce que le serveur ferme au vrai EOF.
-        // Si la tentative n’a rien lu, arrête pour éviter boucle infinie.
         if (readThisAttempt == 0) {
           await _repo.addLog(
             task.id,
@@ -483,14 +474,11 @@ class DownloaderService {
           await _repo.upsertTask(task);
           return;
         }
-
-        // Sinon, on boucle pour reprendre Range=downloaded-
       }
     } finally {
       await raf.close();
     }
 
-    // Fichier final
     await File(task.tempPath).rename(task.savePath);
     await _maybeUnquarantine(task);
     await _setWhereFromsForTask(task);
@@ -581,7 +569,7 @@ class DownloaderService {
     if (e is FileSystemException) {
       final code = e.osError?.errorCode;
       final msg = (e.osError?.message ?? e.message).toLowerCase();
-      if (code == 1) return true; // EPERM
+      if (code == 1) return true;
       if (msg.contains('operation not permitted') || msg.contains('eperm')) {
         return true;
       }
@@ -743,6 +731,31 @@ class DownloaderService {
       if (last.isNotEmpty) return last;
     }
     return 'download.bin';
+  }
+
+  String _sanitizeFileName(String raw) {
+    final s = raw
+        .replaceAll(RegExp(r'[\/\\:*?"<>|]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return s.isEmpty ? 'video' : s;
+  }
+
+  bool _isPlausibleFileName(String s) {
+    if (s.isEmpty) return false;
+    if (!s.contains('.')) return false;
+    if (RegExp(r'^[A-Za-z0-9_-]{16,}$').hasMatch(s)) return false;
+    if (RegExp(r'^[a-f0-9]{16,}$', caseSensitive: false).hasMatch(s)) {
+      return false;
+    }
+    return true;
+  }
+
+  String _ensureExtension(String name, Uri finalUrl) {
+    if (name.contains('.')) return name;
+    final m = RegExp(r'\.([a-zA-Z0-9]{2,5})(?:$|\?)').firstMatch(finalUrl.path);
+    final ext = m != null ? m.group(1) : 'mp4';
+    return '$name.$ext';
   }
 
   Future<void> verify(int taskId) async {

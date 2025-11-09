@@ -1,3 +1,4 @@
+// lib/viewmodels/download_list_vm.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/download_repository.dart';
 import '../data/download_models.dart';
@@ -24,10 +25,17 @@ class DownloadListVm extends StateNotifier<AsyncValue<void>> {
     String dir, {
     String? referer,
     String? userAgent,
+    String? fileName,
   }) async {
     state = const AsyncValue.loading();
     try {
-      await service.addTask(url, dir, referer: referer, userAgent: userAgent);
+      await service.addTask(
+        url,
+        dir,
+        referer: referer,
+        userAgent: userAgent,
+        fileName: fileName,
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -38,6 +46,7 @@ class DownloadListVm extends StateNotifier<AsyncValue<void>> {
   Future<void> pause(int id) => service.pause(id);
   Future<void> delete(int id) => service.cancel(id);
   Future<void> retry(int id) => service.retry(id);
+
   Future<void> fullRetry(int id) async {
     state = const AsyncLoading();
     try {
