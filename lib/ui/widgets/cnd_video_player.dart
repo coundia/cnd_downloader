@@ -1,3 +1,4 @@
+// cnd_video_player.dart
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -36,6 +37,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   DateTime _lastAdvance = DateTime.now();
   int _retry = 0;
   bool _restarting = false;
+  bool _fatalError = false; // NEW: UI state for fatal error
 
   Duration get currentPosition => _c?.value.position ?? Duration.zero;
 
@@ -64,6 +66,12 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   }
 
   Future<void> _open() async {
+    // NEW: Reset all error/retry state on new open
+    _retry = 0;
+    _restarting = false;
+    _fatalError = false;
+    if (mounted) setState(() {});
+
     final c = VideoPlayerController.networkUrl(
       Uri.parse(widget.url),
       httpHeaders: widget.headers ?? const <String, String>{},
@@ -73,7 +81,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     try {
       await c.initialize();
     } catch (_) {
-      _scheduleRetry();
+      _scheduleRetry(); // MODIFIED: Don't increment retry here
       return;
     }
     if (!mounted) return;
@@ -95,7 +103,10 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         _lastPos = v.position;
         _lastAdvance = DateTime.now();
       }
-      if (v.hasError) _scheduleRetry();
+      if (v.hasError) {
+        // MODIFIED: Only schedule retry if not already restarting
+        if (!_restarting) _scheduleRetry();
+      }
       setState(() {});
     });
     _startStallWatch();
@@ -120,13 +131,15 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       if (!isLive) return;
       if (!v.isInitialized) return;
       if (v.hasError) {
-        _scheduleRetry();
+        // MODIFIED
+        if (!_restarting) _scheduleRetry();
         return;
       }
       if (!v.isPlaying) return;
       final stalledFor = DateTime.now().difference(_lastAdvance);
       if (stalledFor.inSeconds >= 6) {
-        _scheduleRetry();
+        // MODIFIED
+        if (!_restarting) _scheduleRetry();
       }
     });
   }
@@ -134,22 +147,37 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   void _scheduleRetry() {
     if (!mounted) return;
     if (_restarting) return;
+
+    // NEW: Increment retry count *when scheduling*
+    _retry++;
+
+    // NEW: Check retry limit
+    if (_retry > 3) {
+      setState(() {
+        _fatalError = true;
+        _restarting = false;
+      });
+      _disposeCtrl(); // Stop the player
+      return;
+    }
+
     _restarting = true;
     _retryT?.cancel();
-    final backoff = 1 << (_retry > 5 ? 5 : _retry);
-    _retryT = Timer(Duration(seconds: backoff), () async {
+    // Use exponential backoff: 1s, 2s, 4s
+    final backoffSeconds = 1 << (_retry - 1);
+    _retryT = Timer(Duration(seconds: backoffSeconds), () async {
       if (!mounted) return;
       await _restartStream();
     });
     setState(() {});
   }
 
-  Future<void> _restartStream() async {
+  Future<void> _restartStream({bool fromStart = false}) async {
     final old = _c;
     if (old == null) return;
     final wasPlaying = old.value.isPlaying;
     final isLive = old.value.duration == Duration.zero;
-    final resume = old.value.position;
+    final resume = fromStart ? Duration.zero : old.value.position;
     final spd = _speeds[_speedIx];
     final vol = old.value.volume;
     _stallT?.cancel();
@@ -173,7 +201,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     try {
       await c.initialize();
     } catch (_) {
-      _retry++;
+      // MODIFIED: Just schedule next retry, don't increment here
       _restarting = false;
       _scheduleRetry();
       return;
@@ -191,7 +219,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         await c.play();
       } catch (_) {}
     }
-    _retry = 0;
+    _retry = 0; // NEW: Reset retry count on SUCCESS
     _restarting = false;
     _lastPos = c.value.position;
     _lastAdvance = DateTime.now();
@@ -203,12 +231,28 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         _lastPos = v.position;
         _lastAdvance = DateTime.now();
       }
-      if (v.hasError) _scheduleRetry();
+      if (v.hasError) {
+        if (!_restarting) _scheduleRetry();
+      }
       setState(() {});
     });
     _startStallWatch();
     _kickAutoHide();
     setState(() {});
+  }
+
+  Future<void> _replay() async {
+    final v = _c?.value;
+    if (v == null) return;
+
+    // NEW: Reset error state on manual replay
+    _retry = 0;
+    _restarting = false;
+    _fatalError = false;
+    if (mounted) setState(() {}); // Update UI to remove error
+
+    final isVod = v.duration != Duration.zero;
+    await _restartStream(fromStart: isVod);
   }
 
   void _toggleControls() {
@@ -312,6 +356,46 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    // NEW: Handle fatal error state
+    if (_fatalError) {
+      return AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Container(
+          color: Colors.black,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              const Text(
+                'Impossible de lire la vidéo.',
+                style: TextStyle(color: Colors.white, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'La connexion a échoué après 3 tentatives.',
+                style: TextStyle(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.replay),
+                label: const Text('Réessayer'),
+                onPressed: _replay, // Use the replay function to retry
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white24,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final c = _c;
     if (c == null || !c.value.isInitialized) {
       return AspectRatio(
@@ -319,10 +403,11 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         child: Container(
           color: Colors.black,
           alignment: Alignment.center,
-          child: const CircularProgressIndicator(),
+          child: const CircularProgressIndicator(color: Colors.white),
         ),
       );
     }
+
     final v = c.value;
     final dur = v.duration;
     final pos = v.position;
@@ -406,6 +491,15 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                   IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
+                    iconSize: 22,
+                    onPressed: _replay,
+                    icon: const Icon(Icons.replay, color: Colors.white),
+                    tooltip: 'Rejouer',
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                     iconSize: 20,
                     onPressed: _toggleMute,
                     icon: Icon(
@@ -473,7 +567,9 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
             fit: StackFit.expand,
             children: [
               VideoPlayer(c),
-              if (v.isBuffering || _restarting)
+
+              // NEW: Separate UI for buffering vs restarting
+              if (v.isBuffering && !_restarting)
                 const Center(
                   child: SizedBox(
                     width: 24,
@@ -484,6 +580,24 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                     ),
                   ),
                 ),
+              // NEW: UI for restarting
+              if (_restarting)
+                Container(
+                  color: Colors.black54,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(color: Colors.white),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Connexion perdue. Tentative $_retry/3...',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+
               Positioned(
                 left: 8,
                 top: 8,
@@ -495,12 +609,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                   decoration: BoxDecoration(
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    (v.duration == Duration.zero) ? 'LIVE' : 'VOD',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: Colors.white),
                   ),
                 ),
               ),

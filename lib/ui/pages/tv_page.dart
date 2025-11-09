@@ -1,6 +1,15 @@
+// lib/pages/tv_page.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../viewmodels/iptv_vm.dart';
+import '../../data/iptv_models.dart';
+import '../../core/settings.dart';
+import '../widgets/cnd_video_player.dart';
+import '../../state/favorites_store.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../viewmodels/iptv_vm.dart';
@@ -27,7 +36,6 @@ class _TvPageState extends ConsumerState<TvPage> {
 
     return Scaffold(
       appBar: AppBar(
-    
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -54,12 +62,12 @@ class _TvPageState extends ConsumerState<TvPage> {
               final filtered = q.isEmpty
                   ? list
                   : list
-                      .where(
-                        (e) => ('${e.name} ${e.groupTitle ?? ''}')
-                            .toLowerCase()
-                            .contains(q),
-                      )
-                      .toList();
+                        .where(
+                          (e) => ('${e.name} ${e.groupTitle ?? ''}')
+                              .toLowerCase()
+                              .contains(q),
+                        )
+                        .toList();
 
               if (filtered.isEmpty) {
                 return const Center(child: Text('Aucune chaîne'));
@@ -67,8 +75,9 @@ class _TvPageState extends ConsumerState<TvPage> {
 
               // favoris actuels
               final favIds = ref.watch(favoritesProvider);
-              final favItems =
-                  filtered.where((e) => favIds.contains(e.id)).toList();
+              final favItems = filtered
+                  .where((e) => favIds.contains(e.id))
+                  .toList();
 
               return LayoutBuilder(
                 builder: (c, bc) {
@@ -76,12 +85,12 @@ class _TvPageState extends ConsumerState<TvPage> {
                   final cross = w >= 1600
                       ? 6
                       : w >= 1200
-                          ? 5
-                          : w >= 900
-                              ? 4
-                              : w >= 600
-                                  ? 3
-                                  : 2;
+                      ? 5
+                      : w >= 900
+                      ? 4
+                      : w >= 600
+                      ? 3
+                      : 2;
 
                   return CustomScrollView(
                     slivers: [
@@ -101,28 +110,25 @@ class _TvPageState extends ConsumerState<TvPage> {
                         SliverPadding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           sliver: SliverGrid(
-                            delegate: SliverChildBuilderDelegate(
-                              (ctx, i) {
-                                final it = favItems[i];
-                                final isFav = favIds.contains(it.id);
-                                return _ChannelCard(
-                                  item: it,
-                                  isFavorite: isFav,
-                                  onToggleFavorite: () => ref
-                                      .read(favoritesProvider.notifier)
-                                      .toggle(it.id),
-                                  onPlay: () => _openPlayer(it),
-                                );
-                              },
-                              childCount: favItems.length,
-                            ),
+                            delegate: SliverChildBuilderDelegate((ctx, i) {
+                              final it = favItems[i];
+                              final isFav = favIds.contains(it.id);
+                              return _ChannelCard(
+                                item: it,
+                                isFavorite: isFav,
+                                onToggleFavorite: () => ref
+                                    .read(favoritesProvider.notifier)
+                                    .toggle(it.id),
+                                onPlay: () => _openPlayer(it),
+                              );
+                            }, childCount: favItems.length),
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: cross,
-                              mainAxisSpacing: 10,
-                              crossAxisSpacing: 10,
-                              childAspectRatio: 2.6,
-                            ),
+                                  crossAxisCount: cross,
+                                  mainAxisSpacing: 10,
+                                  crossAxisSpacing: 10,
+                                  childAspectRatio: 2.6,
+                                ),
                           ),
                         ),
                         const SliverToBoxAdapter(
@@ -150,28 +156,25 @@ class _TvPageState extends ConsumerState<TvPage> {
                       SliverPadding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         sliver: SliverGrid(
-                          delegate: SliverChildBuilderDelegate(
-                            (ctx, i) {
-                              final it = filtered[i];
-                              final isFav = favIds.contains(it.id);
-                              return _ChannelCard(
-                                item: it,
-                                isFavorite: isFav,
-                                onToggleFavorite: () => ref
-                                    .read(favoritesProvider.notifier)
-                                    .toggle(it.id),
-                                onPlay: () => _openPlayer(it),
-                              );
-                            },
-                            childCount: filtered.length,
-                          ),
+                          delegate: SliverChildBuilderDelegate((ctx, i) {
+                            final it = filtered[i];
+                            final isFav = favIds.contains(it.id);
+                            return _ChannelCard(
+                              item: it,
+                              isFavorite: isFav,
+                              onToggleFavorite: () => ref
+                                  .read(favoritesProvider.notifier)
+                                  .toggle(it.id),
+                              onPlay: () => _openPlayer(it),
+                            );
+                          }, childCount: filtered.length),
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: cross,
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 10,
-                            childAspectRatio: 2.6,
-                          ),
+                                crossAxisCount: cross,
+                                mainAxisSpacing: 10,
+                                crossAxisSpacing: 10,
+                                childAspectRatio: 2.6,
+                              ),
                         ),
                       ),
                     ],
@@ -266,8 +269,11 @@ class _ChannelCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.name,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       item.groupTitle ?? '',
@@ -280,7 +286,9 @@ class _ChannelCard extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               IconButton(
-                tooltip: isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris',
+                tooltip: isFavorite
+                    ? 'Retirer des favoris'
+                    : 'Ajouter aux favoris',
                 onPressed: onToggleFavorite,
                 icon: Icon(
                   isFavorite ? Icons.star : Icons.star_border,
@@ -318,8 +326,9 @@ class _LivePlayerPage extends StatelessWidget {
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: url));
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(const SnackBar(content: Text('URL copiée')));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('URL copiée')));
             },
             icon: const Icon(Icons.copy),
           ),
