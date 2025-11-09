@@ -5,8 +5,8 @@ part 'download_models.g.dart';
 @collection
 class DownloadTask {
   Id id = Isar.autoIncrement;
-  late String url; // URL d’origine saisie
-  String? lastRealUrl; // URL finale résolue (après redirections)
+  late String url;
+  String? lastRealUrl;
   String? referer;
   String? userAgent;
   late String fileName;
@@ -20,6 +20,9 @@ class DownloadTask {
   int etaSeconds = 0;
   DateTime createdAt = DateTime.now();
   DateTime updatedAt = DateTime.now();
+
+  String? realFileName; // ← nouveau
+  DateTime? remoteLastModified; // ← nouveau
 }
 
 @collection

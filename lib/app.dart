@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'ui/pages/shell_page.dart';
-import 'ui/pages/home_page.dart';
+import 'ui/pages/download_page.dart';
 import 'ui/pages/settings_page.dart';
 
 class FastDownApp extends StatelessWidget {

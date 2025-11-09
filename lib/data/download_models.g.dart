@@ -47,48 +47,58 @@ const DownloadTaskSchema = CollectionSchema(
       name: r'lastRealUrl',
       type: IsarType.string,
     ),
-    r'referer': PropertySchema(
+    r'realFileName': PropertySchema(
       id: 6,
+      name: r'realFileName',
+      type: IsarType.string,
+    ),
+    r'referer': PropertySchema(
+      id: 7,
       name: r'referer',
       type: IsarType.string,
     ),
+    r'remoteLastModified': PropertySchema(
+      id: 8,
+      name: r'remoteLastModified',
+      type: IsarType.dateTime,
+    ),
     r'savePath': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'savePath',
       type: IsarType.string,
     ),
     r'speedBps': PropertySchema(
-      id: 8,
+      id: 10,
       name: r'speedBps',
       type: IsarType.double,
     ),
     r'state': PropertySchema(
-      id: 9,
+      id: 11,
       name: r'state',
       type: IsarType.string,
     ),
     r'tempPath': PropertySchema(
-      id: 10,
+      id: 12,
       name: r'tempPath',
       type: IsarType.string,
     ),
     r'total': PropertySchema(
-      id: 11,
+      id: 13,
       name: r'total',
       type: IsarType.long,
     ),
     r'updatedAt': PropertySchema(
-      id: 12,
+      id: 14,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
     r'url': PropertySchema(
-      id: 13,
+      id: 15,
       name: r'url',
       type: IsarType.string,
     ),
     r'userAgent': PropertySchema(
-      id: 14,
+      id: 16,
       name: r'userAgent',
       type: IsarType.string,
     )
@@ -116,6 +126,12 @@ int _downloadTaskEstimateSize(
   bytesCount += 3 + object.fileName.length * 3;
   {
     final value = object.lastRealUrl;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.realFileName;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -151,15 +167,17 @@ void _downloadTaskSerialize(
   writer.writeLong(offsets[3], object.etaSeconds);
   writer.writeString(offsets[4], object.fileName);
   writer.writeString(offsets[5], object.lastRealUrl);
-  writer.writeString(offsets[6], object.referer);
-  writer.writeString(offsets[7], object.savePath);
-  writer.writeDouble(offsets[8], object.speedBps);
-  writer.writeString(offsets[9], object.state);
-  writer.writeString(offsets[10], object.tempPath);
-  writer.writeLong(offsets[11], object.total);
-  writer.writeDateTime(offsets[12], object.updatedAt);
-  writer.writeString(offsets[13], object.url);
-  writer.writeString(offsets[14], object.userAgent);
+  writer.writeString(offsets[6], object.realFileName);
+  writer.writeString(offsets[7], object.referer);
+  writer.writeDateTime(offsets[8], object.remoteLastModified);
+  writer.writeString(offsets[9], object.savePath);
+  writer.writeDouble(offsets[10], object.speedBps);
+  writer.writeString(offsets[11], object.state);
+  writer.writeString(offsets[12], object.tempPath);
+  writer.writeLong(offsets[13], object.total);
+  writer.writeDateTime(offsets[14], object.updatedAt);
+  writer.writeString(offsets[15], object.url);
+  writer.writeString(offsets[16], object.userAgent);
 }
 
 DownloadTask _downloadTaskDeserialize(
@@ -176,15 +194,17 @@ DownloadTask _downloadTaskDeserialize(
   object.fileName = reader.readString(offsets[4]);
   object.id = id;
   object.lastRealUrl = reader.readStringOrNull(offsets[5]);
-  object.referer = reader.readStringOrNull(offsets[6]);
-  object.savePath = reader.readString(offsets[7]);
-  object.speedBps = reader.readDouble(offsets[8]);
-  object.state = reader.readString(offsets[9]);
-  object.tempPath = reader.readString(offsets[10]);
-  object.total = reader.readLong(offsets[11]);
-  object.updatedAt = reader.readDateTime(offsets[12]);
-  object.url = reader.readString(offsets[13]);
-  object.userAgent = reader.readStringOrNull(offsets[14]);
+  object.realFileName = reader.readStringOrNull(offsets[6]);
+  object.referer = reader.readStringOrNull(offsets[7]);
+  object.remoteLastModified = reader.readDateTimeOrNull(offsets[8]);
+  object.savePath = reader.readString(offsets[9]);
+  object.speedBps = reader.readDouble(offsets[10]);
+  object.state = reader.readString(offsets[11]);
+  object.tempPath = reader.readString(offsets[12]);
+  object.total = reader.readLong(offsets[13]);
+  object.updatedAt = reader.readDateTime(offsets[14]);
+  object.url = reader.readString(offsets[15]);
+  object.userAgent = reader.readStringOrNull(offsets[16]);
   return object;
 }
 
@@ -210,20 +230,24 @@ P _downloadTaskDeserializeProp<P>(
     case 6:
       return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 8:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 9:
       return (reader.readString(offset)) as P;
     case 10:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 11:
-      return (reader.readLong(offset)) as P;
-    case 12:
-      return (reader.readDateTime(offset)) as P;
-    case 13:
       return (reader.readString(offset)) as P;
+    case 12:
+      return (reader.readString(offset)) as P;
+    case 13:
+      return (reader.readLong(offset)) as P;
     case 14:
+      return (reader.readDateTime(offset)) as P;
+    case 15:
+      return (reader.readString(offset)) as P;
+    case 16:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -846,6 +870,160 @@ extension DownloadTaskQueryFilter
   }
 
   QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'realFileName',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'realFileName',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'realFileName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'realFileName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'realFileName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'realFileName',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'realFileName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'realFileName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'realFileName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'realFileName',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'realFileName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      realFileNameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'realFileName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
       refererIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -995,6 +1173,80 @@ extension DownloadTaskQueryFilter
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'referer',
         value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      remoteLastModifiedIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'remoteLastModified',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      remoteLastModifiedIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'remoteLastModified',
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      remoteLastModifiedEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'remoteLastModified',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      remoteLastModifiedGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'remoteLastModified',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      remoteLastModifiedLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'remoteLastModified',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterFilterCondition>
+      remoteLastModifiedBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'remoteLastModified',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -1952,6 +2204,19 @@ extension DownloadTaskQuerySortBy
     });
   }
 
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> sortByRealFileName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'realFileName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy>
+      sortByRealFileNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'realFileName', Sort.desc);
+    });
+  }
+
   QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> sortByReferer() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'referer', Sort.asc);
@@ -1961,6 +2226,20 @@ extension DownloadTaskQuerySortBy
   QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> sortByRefererDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'referer', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy>
+      sortByRemoteLastModified() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'remoteLastModified', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy>
+      sortByRemoteLastModifiedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'remoteLastModified', Sort.desc);
     });
   }
 
@@ -2151,6 +2430,19 @@ extension DownloadTaskQuerySortThenBy
     });
   }
 
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> thenByRealFileName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'realFileName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy>
+      thenByRealFileNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'realFileName', Sort.desc);
+    });
+  }
+
   QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> thenByReferer() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'referer', Sort.asc);
@@ -2160,6 +2452,20 @@ extension DownloadTaskQuerySortThenBy
   QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy> thenByRefererDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'referer', Sort.desc);
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy>
+      thenByRemoteLastModified() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'remoteLastModified', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QAfterSortBy>
+      thenByRemoteLastModifiedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'remoteLastModified', Sort.desc);
     });
   }
 
@@ -2300,10 +2606,24 @@ extension DownloadTaskQueryWhereDistinct
     });
   }
 
+  QueryBuilder<DownloadTask, DownloadTask, QDistinct> distinctByRealFileName(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'realFileName', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<DownloadTask, DownloadTask, QDistinct> distinctByReferer(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'referer', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<DownloadTask, DownloadTask, QDistinct>
+      distinctByRemoteLastModified() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'remoteLastModified');
     });
   }
 
@@ -2405,9 +2725,22 @@ extension DownloadTaskQueryProperty
     });
   }
 
+  QueryBuilder<DownloadTask, String?, QQueryOperations> realFileNameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'realFileName');
+    });
+  }
+
   QueryBuilder<DownloadTask, String?, QQueryOperations> refererProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'referer');
+    });
+  }
+
+  QueryBuilder<DownloadTask, DateTime?, QQueryOperations>
+      remoteLastModifiedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'remoteLastModified');
     });
   }
 

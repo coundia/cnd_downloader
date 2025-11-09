@@ -15,6 +15,12 @@ import '../data/download_repository.dart';
 import 'prober.dart';
 import 'segment_worker.dart';
 
+class _PageMeta {
+  final String? title;
+  final DateTime? datePublished;
+  const _PageMeta({this.title, this.datePublished});
+}
+
 class DownloaderService {
   final Dio _dio;
   final CookieJar _jar;
@@ -104,8 +110,56 @@ class DownloaderService {
         candidate = _sanitizeFileName(candidate);
         candidate = _ensureExtension(candidate, p.finalUrl);
 
+        final base0 = _splitNameExt(candidate)[0];
+        if (_isGenericBase(base0)) {
+          final meta0 = await _tryResolvePageMeta(
+            referer: t.referer,
+            finalUrl: p.finalUrl.toString(),
+            userAgent: t.userAgent,
+          );
+          if ((meta0.title ?? '').trim().isNotEmpty) {
+            candidate = _ensureExtension(
+              _sanitizeFileName(meta0.title!.trim()),
+              p.finalUrl,
+            );
+          }
+        }
+
+        DateTime? lm;
+        try {
+          final head = await _dio.head(
+            p.finalUrl.toString(),
+            options: Options(
+              followRedirects: true,
+              maxRedirects: 0,
+              validateStatus: (s) => s != null && s < 500,
+              headers: {
+                'accept-encoding': 'identity',
+                if (t.referer != null) 'referer': t.referer!,
+                if (t.userAgent != null) 'user-agent': t.userAgent!,
+              },
+            ),
+          );
+          final lmStr = head.headers.value('last-modified');
+          if (lmStr != null) lm = HttpDate.parse(lmStr);
+        } catch (_) {}
+
+        var base1 = _splitNameExt(candidate)[0];
+        if (_isGenericBase(base1)) {
+          base1 = 'Video';
+          candidate = _ensureExtension(base1, p.finalUrl);
+        }
+
+        final meta = await _tryResolvePageMeta(
+          referer: t.referer,
+          finalUrl: p.finalUrl.toString(),
+          userAgent: t.userAgent,
+        );
+        final dt = meta.datePublished ?? lm ?? DateTime.now();
+        final dated = _prefixDate(candidate, dt);
+
         final dir = File(t.savePath).parent.path;
-        final unique = _dedupeNameInDir(dir, candidate);
+        final unique = _dedupeNameInDir(dir, dated);
 
         final oldTemp = t.tempPath;
         final oldSave = t.savePath;
@@ -771,6 +825,8 @@ class DownloaderService {
   bool _isPlausibleFileName(String s) {
     if (s.isEmpty) return false;
     if (!s.contains('.')) return false;
+    final base = _splitNameExt(s)[0];
+    if (_isGenericBase(base)) return false;
     if (RegExp(r'^[A-Za-z0-9_-]{16,}$').hasMatch(s)) return false;
     if (RegExp(r'^[a-f0-9]{16,}$', caseSensitive: false).hasMatch(s)) {
       return false;
@@ -860,5 +916,139 @@ class DownloaderService {
 
   Future<void> fullRetry(int id) async {
     return retry(id);
+  }
+
+  bool _isGenericBase(String base) {
+    final b = base.trim().toLowerCase();
+    if (b.isEmpty) return true;
+    if (b.length <= 2) return true;
+    const bad = {'id', 'file', 'video', 'download', 'index'};
+    if (bad.contains(b)) return true;
+    if (RegExp(r'^\d+$').hasMatch(b)) return true;
+    if (RegExp(r'^[a-f0-9]{8,}$', caseSensitive: false).hasMatch(b)) {
+      return true;
+    }
+    return false;
+  }
+
+  Future<_PageMeta> _tryResolvePageMeta({
+    String? referer,
+    required String finalUrl,
+    String? userAgent,
+  }) async {
+    if ((referer ?? '').isNotEmpty) {
+      final m = await _fetchMetaFrom(referer!, userAgent: userAgent);
+      if (m.title != null || m.datePublished != null) return m;
+    }
+    try {
+      final head = await _dio.head(
+        finalUrl,
+        options: Options(
+          followRedirects: true,
+          headers: {
+            'accept': 'text/html,*/*;q=0.8',
+            if (userAgent != null) 'user-agent': userAgent,
+          },
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      final ct = head.headers.value('content-type') ?? '';
+      if (ct.toLowerCase().contains('text/html')) {
+        return await _fetchMetaFrom(finalUrl, userAgent: userAgent);
+      }
+    } catch (_) {}
+    return const _PageMeta();
+  }
+
+  Future<_PageMeta> _fetchMetaFrom(String url, {String? userAgent}) async {
+    try {
+      final resp = await _dio.get<String>(
+        url,
+        options: Options(
+          responseType: ResponseType.plain,
+          followRedirects: true,
+          headers: {
+            'accept': 'text/html,*/*;q=0.8',
+            if (userAgent != null) 'user-agent': userAgent,
+          },
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      final html = resp.data ?? '';
+      final title = _extractTitle(html);
+      final date = _extractDate(html);
+      return _PageMeta(title: title, datePublished: date);
+    } catch (_) {
+      return const _PageMeta();
+    }
+  }
+
+  String? _extractTitle(String html) {
+    String? g(RegExp r) => r.firstMatch(html)?.group(1);
+    final reOg = RegExp(
+      r'''<meta[^>]+property=["\']og:title["\'][^>]*content=["\']([^"\']+)["\']''',
+      caseSensitive: false,
+    );
+    final reTw = RegExp(
+      r'''<meta[^>]+name=["\']twitter:title["\'][^>]*content=["\']([^"\']+)["\']''',
+      caseSensitive: false,
+    );
+    final reTi = RegExp(
+      r'''<title[^>]*>([^<]{1,200})</title>''',
+      caseSensitive: false,
+    );
+    return g(reOg) ?? g(reTw) ?? g(reTi);
+  }
+
+  DateTime? _extractDate(String html) {
+    String? g(RegExp r) => r.firstMatch(html)?.group(1);
+    final cands = <String?>[
+      g(
+        RegExp(
+          r'''<meta[^>]+property=["\']article:published_time["\'][^>]*content=["\']([^"\']+)["\']''',
+          caseSensitive: false,
+        ),
+      ),
+      g(
+        RegExp(
+          r'''<meta[^>]+property=["\']og:updated_time["\'][^>]*content=["\']([^"\']+)["\']''',
+          caseSensitive: false,
+        ),
+      ),
+      g(
+        RegExp(
+          r'''<meta[^>]+name=["\']date["\'][^>]*content=["\']([^"\']+)["\']''',
+          caseSensitive: false,
+        ),
+      ),
+      g(
+        RegExp(
+          r'''<time[^>]+datetime=["\']([^"\']+)["\']''',
+          caseSensitive: false,
+        ),
+      ),
+    ];
+    for (final s in cands) {
+      if (s == null) continue;
+      final dt = DateTime.tryParse(s);
+      if (dt != null) return dt.toLocal();
+    }
+    return null;
+  }
+
+  String _dateYmd(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
+  }
+
+  String _prefixDate(String name, DateTime d) {
+    final parts = _splitNameExt(name);
+    final base = parts[0];
+    final ext = parts[1];
+    final prefix = _dateYmd(d);
+    if (base.startsWith('$prefix ')) return name;
+    return '$prefix $base$ext';
   }
 }

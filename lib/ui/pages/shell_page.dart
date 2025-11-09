@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'home_page.dart';
+import 'download_page.dart';
 import 'tv_page.dart';
 import 'movies_page.dart';
 import 'series_page.dart';
