@@ -1,8 +1,10 @@
-// cnd_video_player.dart
+// lib/ui/widgets/cnd_video_player.dart
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:pip_view/pip_view.dart';
 import 'package:video_player/video_player.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class CndVideoPlayer extends StatefulWidget {
   final String url;
@@ -29,15 +31,18 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   bool _show = true;
   Timer? _hideT;
   Timer? _stallT;
-  Timer? _retryT;
+
+  Timer? _retryTicker;
+  int _retryAttempts = 0;
+  static const int _maxRetries = 3;
+  static const int _stallThresholdSec = 4;
+  bool _restarting = false;
+
   double _lastVol = 1.0;
   final List<double> _speeds = const [0.5, 1.0, 1.25, 1.5, 2.0];
   int _speedIx = 1;
   Duration _lastPos = Duration.zero;
   DateTime _lastAdvance = DateTime.now();
-  int _retry = 0;
-  bool _restarting = false;
-  bool _fatalError = false;
 
   Duration get currentPosition => _c?.value.position ?? Duration.zero;
 
@@ -60,16 +65,14 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   void dispose() {
     _hideT?.cancel();
     _stallT?.cancel();
-    _retryT?.cancel();
+    _retryTicker?.cancel();
     _disposeCtrl();
     super.dispose();
   }
 
   Future<void> _open() async {
-    _retry = 0;
+    _retryAttempts = 0;
     _restarting = false;
-    _fatalError = false;
-    if (mounted) setState(() {});
 
     final c = VideoPlayerController.networkUrl(
       Uri.parse(widget.url),
@@ -77,6 +80,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
     _c = c;
+
     try {
       await c.initialize();
     } catch (_) {
@@ -84,6 +88,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       return;
     }
     if (!mounted) return;
+
     if ((widget.startAt ?? Duration.zero) > Duration.zero &&
         c.value.duration != Duration.zero) {
       await c.seekTo(widget.startAt!);
@@ -92,8 +97,10 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     await c.setVolume(_lastVol);
     await c.setPlaybackSpeed(_speeds[_speedIx]);
     if (widget.autoPlay) await c.play();
+
     _lastPos = c.value.position;
     _lastAdvance = DateTime.now();
+
     c.addListener(() {
       if (!mounted) return;
       final v = c.value;
@@ -101,14 +108,12 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       if (v.position > _lastPos) {
         _lastPos = v.position;
         _lastAdvance = DateTime.now();
+        _cancelRetryPipeline();
       }
-      if (v.hasError) {
-        if (!_restarting) _scheduleRetry();
-      }
-      // (MODIFIED) On s'assure que le setState est appelé pour
-      // mettre à jour le slider de volume et le buffer
-      if (mounted) setState(() {});
+      if (v.hasError) _scheduleRetry();
+      setState(() {});
     });
+
     _startStallWatch();
     _kickAutoHide();
     setState(() {});
@@ -127,18 +132,22 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       final c = _c;
       if (c == null) return;
       final v = c.value;
-      final isLive = v.duration == Duration.zero;
-      if (!isLive) return;
       if (!v.isInitialized) return;
+
+      final isVod = v.duration != Duration.zero;
+      final nearEnd =
+          isVod &&
+          (v.duration - v.position) <= const Duration(milliseconds: 700);
+      if (nearEnd) return;
+
       if (v.hasError) {
-        if (!_restarting) _scheduleRetry();
+        _scheduleRetry();
         return;
       }
       if (!v.isPlaying) return;
+
       final stalledFor = DateTime.now().difference(_lastAdvance);
-      if (stalledFor.inSeconds >= 6) {
-        if (!_restarting) _scheduleRetry();
-      }
+      if (stalledFor.inSeconds >= _stallThresholdSec) _scheduleRetry();
     });
   }
 
@@ -146,35 +155,60 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     if (!mounted) return;
     if (_restarting) return;
 
-    _retry++;
-
-    if (_retry > 3) {
-      setState(() {
-        _fatalError = true;
-        _restarting = false;
-      });
-      _disposeCtrl();
-      return;
+    final c = _c;
+    if (c != null && c.value.isPlaying) {
+      final stalledFor = DateTime.now().difference(_lastAdvance);
+      if (stalledFor.inSeconds < _stallThresholdSec && !c.value.hasError)
+        return;
     }
 
     _restarting = true;
-    _retryT?.cancel();
-    final backoffSeconds = 1 << (_retry - 1);
-    _retryT = Timer(Duration(seconds: backoffSeconds), () async {
-      if (!mounted) return;
+    _retryAttempts = 0;
+    _showAttemptSnack();
+
+    _retryTicker?.cancel();
+    _retryTicker = Timer.periodic(const Duration(seconds: 1), (t) async {
+      if (!mounted) {
+        t.cancel();
+        _retryTicker = null;
+        return;
+      }
+
+      final conn = await Connectivity().checkConnectivity();
+      if (conn == ConnectivityResult.none) return;
+
+      _retryAttempts++;
+      _showAttemptSnack();
+
       await _restartStream();
+
+      final ok = _c != null && _c!.value.isInitialized && !_c!.value.hasError;
+      if (ok) {
+        _cancelRetryPipeline();
+        return;
+      }
+
+      if (_retryAttempts >= _maxRetries) {
+        t.cancel();
+        _retryTicker = null;
+        _restarting = false;
+        _showFailedSnack();
+      }
     });
+
     setState(() {});
   }
 
   Future<void> _restartStream({bool fromStart = false}) async {
     final old = _c;
     if (old == null) return;
+
     final wasPlaying = old.value.isPlaying;
     final isLive = old.value.duration == Duration.zero;
     final resume = fromStart ? Duration.zero : old.value.position;
     final spd = _speeds[_speedIx];
     final vol = old.value.volume;
+
     _stallT?.cancel();
     _hideT?.cancel();
     try {
@@ -193,14 +227,15 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
     _c = c;
+
     try {
       await c.initialize();
     } catch (_) {
-      _restarting = false;
-      _scheduleRetry();
+      setState(() {});
       return;
     }
     if (!mounted) return;
+
     if (!isLive && resume > Duration.zero) {
       try {
         await c.seekTo(resume);
@@ -213,10 +248,10 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         await c.play();
       } catch (_) {}
     }
-    _retry = 0;
-    _restarting = false;
+
     _lastPos = c.value.position;
     _lastAdvance = DateTime.now();
+
     c.addListener(() {
       if (!mounted) return;
       final v = c.value;
@@ -224,13 +259,12 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
       if (v.position > _lastPos) {
         _lastPos = v.position;
         _lastAdvance = DateTime.now();
+        _cancelRetryPipeline();
       }
-      if (v.hasError) {
-        if (!_restarting) _scheduleRetry();
-      }
-      // (MODIFIED)
-      if (mounted) setState(() {});
+      if (v.hasError) _scheduleRetry();
+      setState(() {});
     });
+
     _startStallWatch();
     _kickAutoHide();
     setState(() {});
@@ -239,18 +273,52 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   Future<void> _replay() async {
     final v = _c?.value;
     if (v == null) {
-      // (NEW) Si la fatal error a eu lieu, _c est null
-      _open(); // Tente de rouvrir
+      _open();
       return;
     }
-
-    _retry = 0;
+    _retryAttempts = 0;
     _restarting = false;
-    _fatalError = false;
-    if (mounted) setState(() {});
-
     final isVod = v.duration != Duration.zero;
     await _restartStream(fromStart: isVod);
+  }
+
+  void _cancelRetryPipeline() {
+    _retryTicker?.cancel();
+    _retryTicker = null;
+    _restarting = false;
+    _retryAttempts = 0;
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+  }
+
+  void _showAttemptSnack() {
+    final m = ScaffoldMessenger.maybeOf(context);
+    if (m == null) return;
+    m.hideCurrentSnackBar();
+    m.showSnackBar(
+      SnackBar(
+        content: Text(
+          'Reconnexion… (${_retryAttempts.clamp(1, _maxRetries)}/$_maxRetries)',
+        ),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _showFailedSnack() {
+    final m = ScaffoldMessenger.maybeOf(context);
+    if (m == null) return;
+    m.hideCurrentSnackBar();
+    m.showSnackBar(
+      SnackBar(
+        content: const Text('Lecture interrompue'),
+        action: SnackBarAction(label: 'Réessayer', onPressed: _replay),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(12),
+        duration: const Duration(seconds: 6),
+      ),
+    );
   }
 
   void _toggleControls() {
@@ -341,8 +409,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     } else {
       await c.setVolume(_lastVol <= 0 ? 1.0 : _lastVol);
     }
-    // (MODIFIED) Le listener s'en occupe
-    // setState(() {});
   }
 
   void _cycleSpeed() async {
@@ -350,342 +416,343 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     if (c == null) return;
     _speedIx = (_speedIx + 1) % _speeds.length;
     await c.setPlaybackSpeed(_speeds[_speedIx]);
-    // (MODIFIED) Le listener s'en occupe
-    // setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_fatalError) {
-      return AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Container(
-          color: Colors.black,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 48),
-              const SizedBox(height: 16),
-              const Text(
-                'Impossible de lire la vidéo.',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'La connexion a échoué après 3 tentatives.',
-                style: TextStyle(color: Colors.white70),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.replay),
-                label: const Text('Réessayer'),
-                onPressed: _replay,
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Colors.white24,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    return PIPView(
+      initialCorner: PIPViewCorner.topRight,
+      floatingWidth: 240,
+      floatingHeight: 135,
+      builder: (pipContext, isFloating) {
+        final controller = _c;
 
-    final c = _c;
-    if (c == null || !c.value.isInitialized) {
-      return AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Container(
-          color: Colors.black,
-          alignment: Alignment.center,
-          child: const CircularProgressIndicator(color: Colors.white),
-        ),
-      );
-    }
-    final v = c.value;
-    final dur = v.duration;
-    final pos = v.position;
-    final live = dur == Duration.zero;
-    final ratio = live
-        ? 0.0
-        : (dur.inMilliseconds == 0
-              ? 0.0
-              : pos.inMilliseconds / dur.inMilliseconds.clamp(1, 1 << 31));
+        if (controller == null || !controller.value.isInitialized) {
+          return AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Container(
+              color: Colors.black,
+              alignment: Alignment.center,
+              child: const CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+        }
 
-    // (NEW) Calcul du buffer
-    final buffered = v.buffered.isEmpty ? Duration.zero : v.buffered.last.end;
-    final bufferRatio = (dur == Duration.zero || dur.inMilliseconds == 0)
-        ? 0.0
-        : buffered.inMilliseconds / dur.inMilliseconds;
+        final v = controller.value;
+        final dur = v.duration;
+        final pos = v.position;
+        final live = dur == Duration.zero;
 
-    final controls = FittedBox(
-      fit: BoxFit.scaleDown,
-      alignment: Alignment.bottomCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1000),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!live)
-                // (MODIFIED) Stack pour superposer la barre de buffer
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // (NEW) Barre de progression du buffer
-                    LinearProgressIndicator(
-                      value: bufferRatio.clamp(0.0, 1.0),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Colors.white54,
-                      ),
-                      backgroundColor: Colors.white24,
-                      minHeight: 2.5, // Doit correspondre au trackHeight
-                    ),
-                    SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 2.5,
-                        thumbShape: const RoundSliderThumbShape(
-                          enabledThumbRadius: 6,
-                        ),
-                        // (NEW) Permet au slider de dessiner par-dessus
-                        trackShape: const RectangularSliderTrackShape(),
-                        overlayShape: const RoundSliderOverlayShape(
-                          overlayRadius: 12,
-                        ),
-                        activeTrackColor: Colors.white,
-                        // (MODIFIED) Rendu transparent pour voir le LinearProgressIndicator
-                        inactiveTrackColor: Colors.transparent,
-                        thumbColor: Colors.white,
-                      ),
-                      child: Slider(
-                        value: ratio.clamp(0.0, 1.0),
-                        onChanged: (v) {
-                          final ms = (dur.inMilliseconds * v).toInt();
-                          c.seekTo(Duration(milliseconds: ms));
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              Row(
+        final double ratio = live
+            ? 0.0
+            : (dur.inMilliseconds == 0
+                  ? 0.0
+                  : pos.inMilliseconds / dur.inMilliseconds);
+
+        final buffered = v.buffered.isEmpty
+            ? Duration.zero
+            : v.buffered.last.end;
+        final double bufferRatio =
+            (dur == Duration.zero || dur.inMilliseconds == 0)
+            ? 0.0
+            : buffered.inMilliseconds / dur.inMilliseconds;
+
+        final showGoLive =
+            live && DateTime.now().difference(_lastAdvance).inSeconds >= 3;
+
+        final controls = FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    iconSize: 24,
-                    onPressed: _togglePlay,
-                    icon: Icon(
-                      v.isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                    ),
-                    tooltip: v.isPlaying ? 'Pause' : 'Play',
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    iconSize: 22,
-                    onPressed: () => _seekBy(const Duration(seconds: -10)),
-                    icon: const Icon(Icons.replay_10, color: Colors.white),
-                    tooltip: '-10s',
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    iconSize: 22,
-                    onPressed: () => _seekBy(const Duration(seconds: 10)),
-                    icon: const Icon(Icons.forward_10, color: Colors.white),
-                    tooltip: '+10s',
-                  ),
-                  const SizedBox(width: 10),
                   if (!live)
-                    Text(
-                      '${_fmt(pos)} / ${_fmt(dur)}  •  -${_fmt(dur - pos)}',
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    )
-                  else
-                    const Text(
-                      'LIVE',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  const Spacer(),
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    iconSize: 22,
-                    onPressed: _replay,
-                    icon: const Icon(Icons.replay, color: Colors.white),
-                    tooltip: 'Rejouer',
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    iconSize: 20,
-                    onPressed: _toggleMute,
-                    icon: Icon(
-                      v.volume > 0 ? Icons.volume_up : Icons.volume_off,
-                      color: Colors.white,
-                    ),
-                    tooltip: v.volume > 0 ? 'Mute' : 'Unmute',
-                  ),
-                  // (NEW) Slider de volume
-                  SizedBox(
-                    width: 80,
-                    height: 24,
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 2.0,
-                        thumbShape: const RoundSliderThumbShape(
-                          enabledThumbRadius: 6,
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        LinearProgressIndicator(
+                          value: bufferRatio.clamp(0.0, 1.0),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Colors.white54,
+                          ),
+                          backgroundColor: Colors.white24,
+                          minHeight: 2.5,
                         ),
-                        overlayShape: const RoundSliderOverlayShape(
-                          overlayRadius: 12,
+                        SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 2.5,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 6,
+                            ),
+                            trackShape: const RectangularSliderTrackShape(),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 12,
+                            ),
+                            activeTrackColor: Colors.white,
+                            inactiveTrackColor: Colors.transparent,
+                            thumbColor: Colors.white,
+                          ),
+                          child: Slider(
+                            value: ratio.clamp(0.0, 1.0),
+                            onChanged: (v) {
+                              final ms = (dur.inMilliseconds * v).toInt();
+                              controller.seekTo(Duration(milliseconds: ms));
+                            },
+                          ),
                         ),
-                        activeTrackColor: Colors.white,
-                        inactiveTrackColor: Colors.white24,
-                        thumbColor: Colors.white,
-                        overlayColor: Colors.white.withOpacity(0.3),
-                      ),
-                      child: Slider(
-                        value: v.volume,
-                        min: 0.0,
-                        max: 1.0,
-                        onChanged: (vol) {
-                          c.setVolume(vol);
-                          if (vol > 0) _lastVol = vol;
-                        },
-                      ),
+                      ],
                     ),
-                  ),
-                  // (MODIFIED) Réduction de l'espace
-                  const SizedBox(width: 2),
-                  TextButton(
-                    onPressed: _cycleSpeed,
-                    child: Text(
-                      '${_speeds[_speedIx]}x',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    iconSize: 22,
-                    onPressed: widget.isFullscreen
-                        ? () {
-                            final p = _c?.value.position ?? Duration.zero;
-                            Navigator.of(context).pop<Duration?>(p);
-                          }
-                        : _enterFullscreen,
-                    icon: Icon(
-                      widget.isFullscreen
-                          ? Icons.fullscreen_exit
-                          : Icons.fullscreen,
-                      color: Colors.white,
-                    ),
-                    tooltip: widget.isFullscreen
-                        ? 'Exit full screen'
-                        : 'Full screen',
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    final aspect = v.aspectRatio == 0 ? (16 / 9) : v.aspectRatio;
-    return AspectRatio(
-      aspectRatio: aspect,
-      child: Container(
-        color: Colors.black,
-        child: GestureDetector(
-          onTap: _toggleControls,
-          onDoubleTapDown: (d) {
-            final w = MediaQuery.of(context).size.width;
-            final x = d.globalPosition.dx;
-            if (x < w * 0.5) {
-              _seekBy(const Duration(seconds: -10));
-            } else {
-              _seekBy(const Duration(seconds: 10));
-            }
-            _show = true;
-            _kickAutoHide();
-            setState(() {});
-          },
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              VideoPlayer(c),
-              if (v.isBuffering && !_restarting)
-                const Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              if (_restarting)
-                Container(
-                  color: Colors.black54,
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Row(
                     children: [
-                      const CircularProgressIndicator(color: Colors.white),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Connexion perdue. Tentative $_retry/3...',
-                        style: const TextStyle(color: Colors.white),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        iconSize: 24,
+                        onPressed: _togglePlay,
+                        icon: Icon(
+                          v.isPlaying ? Icons.pause : Icons.play_arrow,
+                          color: Colors.white,
+                        ),
+                        tooltip: v.isPlaying ? 'Pause' : 'Play',
+                      ),
+                      const SizedBox(width: 6),
+                      if (!live) ...[
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          iconSize: 22,
+                          onPressed: () =>
+                              _seekBy(const Duration(seconds: -10)),
+                          icon: const Icon(
+                            Icons.replay_10,
+                            color: Colors.white,
+                          ),
+                          tooltip: '-10s',
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          iconSize: 22,
+                          onPressed: () => _seekBy(const Duration(seconds: 10)),
+                          icon: const Icon(
+                            Icons.forward_10,
+                            color: Colors.white,
+                          ),
+                          tooltip: '+10s',
+                        ),
+                      ],
+                      const SizedBox(width: 10),
+                      if (!live)
+                        Text(
+                          '${_fmt(pos)} / ${_fmt(dur)}  •  -${_fmt(dur - pos)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        )
+                      else
+                        Row(
+                          children: [
+                            const Text(
+                              'LIVE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (showGoLive)
+                              TextButton(
+                                onPressed: () =>
+                                    _restartStream(fromStart: false),
+                                child: const Text(
+                                  'Go Live',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                          ],
+                        ),
+                      const Spacer(),
+                      // Mini-player button using local PIPView
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        iconSize: 22,
+                        onPressed: () => PIPView.of(pipContext)?.presentBelow(
+                          _PipBottom(
+                            onClose: () =>
+                                PIPView.of(pipContext)?.stopFloating(),
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.picture_in_picture_alt_rounded,
+                          color: Colors.white,
+                        ),
+                        tooltip: 'Mini-lecteur',
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        iconSize: 22,
+                        onPressed: _replay,
+                        icon: const Icon(Icons.replay, color: Colors.white),
+                        tooltip: 'Rejouer',
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        iconSize: 20,
+                        onPressed: _toggleMute,
+                        icon: Icon(
+                          v.volume > 0 ? Icons.volume_up : Icons.volume_off,
+                          color: Colors.white,
+                        ),
+                        tooltip: v.volume > 0 ? 'Mute' : 'Unmute',
+                      ),
+                      SizedBox(
+                        width: 80,
+                        height: 24,
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 2.0,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 6,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 12,
+                            ),
+                            activeTrackColor: Colors.white,
+                            inactiveTrackColor: Colors.white24,
+                            thumbColor: Colors.white,
+                            overlayColor: Colors.white30,
+                          ),
+                          child: Slider(
+                            value: v.volume.clamp(0.0, 1.0),
+                            min: 0.0,
+                            max: 1.0,
+                            onChanged: (vol) {
+                              controller.setVolume(vol);
+                              if (vol > 0) _lastVol = vol;
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      TextButton(
+                        onPressed: _cycleSpeed,
+                        child: Text(
+                          '${_speeds[_speedIx]}x',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        iconSize: 22,
+                        onPressed: widget.isFullscreen
+                            ? () {
+                                final p = _c?.value.position ?? Duration.zero;
+                                Navigator.of(context).pop<Duration?>(p);
+                              }
+                            : _enterFullscreen,
+                        icon: Icon(
+                          widget.isFullscreen
+                              ? Icons.fullscreen_exit
+                              : Icons.fullscreen,
+                          color: Colors.white,
+                        ),
+                        tooltip: widget.isFullscreen
+                            ? 'Exit full screen'
+                            : 'Full screen',
                       ),
                     ],
                   ),
-                ),
-              Positioned(
-                left: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    (v.duration == Duration.zero) ? 'LIVE' : 'VOD',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.labelSmall?.copyWith(color: Colors.white),
-                  ),
-                ),
+                ],
               ),
-              if (_show)
-                Positioned(
-                  left: 8,
-                  right: 8,
-                  bottom: 8,
-                  child: Material(
-                    color: Colors.black.withOpacity(0.35),
-                    borderRadius: BorderRadius.circular(8),
-                    child: controls,
-                  ),
-                ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+
+        final aspect = v.aspectRatio == 0 ? (16 / 9) : v.aspectRatio;
+        return AspectRatio(
+          aspectRatio: aspect,
+          child: Container(
+            color: Colors.black,
+            child: GestureDetector(
+              onTap: _toggleControls,
+              onDoubleTapDown: (d) {
+                final w = MediaQuery.of(context).size.width;
+                final x = d.globalPosition.dx;
+                if (!live) {
+                  if (x < w * 0.5) {
+                    _seekBy(const Duration(seconds: -10));
+                  } else {
+                    _seekBy(const Duration(seconds: 10));
+                  }
+                }
+                _show = true;
+                _kickAutoHide();
+                setState(() {});
+              },
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  VideoPlayer(controller),
+                  if (v.isBuffering && !_restarting)
+                    const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    left: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        live ? 'LIVE' : 'VOD',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.labelSmall?.copyWith(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  if (_show && !isFloating)
+                    Positioned(
+                      left: 8,
+                      right: 8,
+                      bottom: 8,
+                      child: Material(
+                        color: Colors.black.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(8),
+                        child: controls,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -757,6 +824,30 @@ class _FullscreenVideoState extends State<_FullscreenVideo> {
               startAt: widget.startAt,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Optional bottom content shown when mini-player is active
+class _PipBottom extends StatelessWidget {
+  final VoidCallback onClose;
+  const _PipBottom({required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mode mini lecteur'),
+        actions: [
+          IconButton(icon: const Icon(Icons.close), onPressed: onClose),
+        ],
+      ),
+      body: const Center(
+        child: Text(
+          'Continuez votre navigation.\nTouchez le mini lecteur pour le fermer.',
+          textAlign: TextAlign.center,
         ),
       ),
     );

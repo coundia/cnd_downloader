@@ -53,6 +53,7 @@ dependencies:
   video_player_media_kit: ^1.0.7
   video_player: ^2.9.2
   media_kit_libs_macos_video: any
+  pip_view: any
 
 dev_dependencies:
   flutter_test:

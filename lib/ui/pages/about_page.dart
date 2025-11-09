@@ -52,7 +52,7 @@ class AboutPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Developer Full-stack',
+                  'Developer',
                   textAlign: TextAlign.center,
                   style: Theme.of(
                     context,
