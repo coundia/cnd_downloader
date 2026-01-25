@@ -22,6 +22,7 @@ class _TvPageState extends ConsumerState<TvPage> {
   final _searchFocus = FocusNode();
 
   String q = '';
+  bool listMode = false;
 
   @override
   void dispose() {
@@ -40,8 +41,20 @@ class _TvPageState extends ConsumerState<TvPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('TV'),
-        centerTitle: false,
         actions: [
+          IconButton(
+            tooltip: 'Mode liste',
+            isSelected: listMode,
+            onPressed: () => setState(() => listMode = true),
+            icon: const Icon(Icons.view_list),
+          ),
+          IconButton(
+            tooltip: 'Mode grille',
+            isSelected: !listMode,
+            onPressed: () => setState(() => listMode = false),
+            icon: const Icon(Icons.grid_view),
+          ),
+          const SizedBox(width: 6),
           IconButton(
             tooltip: 'Effacer la recherche',
             onPressed: q.isEmpty
@@ -53,7 +66,6 @@ class _TvPageState extends ConsumerState<TvPage> {
                   },
             icon: const Icon(Icons.close),
           ),
-          const SizedBox(width: 6),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(72),
@@ -108,8 +120,6 @@ class _TvPageState extends ConsumerState<TvPage> {
               return LayoutBuilder(
                 builder: (c, bc) {
                   final w = bc.maxWidth;
-                  final isSmall = w < 600;
-
                   final cross = w >= 1600
                       ? 6
                       : w >= 1200
@@ -121,7 +131,7 @@ class _TvPageState extends ConsumerState<TvPage> {
                       : 2;
 
                   Widget favSliver() {
-                    if (isSmall) {
+                    if (listMode) {
                       return SliverList(
                         delegate: SliverChildBuilderDelegate((ctx, i) {
                           final it = favItems[i];
@@ -168,7 +178,7 @@ class _TvPageState extends ConsumerState<TvPage> {
                   }
 
                   Widget allSliver() {
-                    if (isSmall) {
+                    if (listMode) {
                       return SliverList(
                         delegate: SliverChildBuilderDelegate((ctx, i) {
                           final it = filtered[i];
@@ -252,7 +262,11 @@ class _TvPageState extends ConsumerState<TvPage> {
                           sliver: SliverToBoxAdapter(
                             child: _SectionHeader(
                               title: 'Favoris',
-                              trailing: Text('${favItems.length}'),
+                              trailing: Text(
+                                '${favItems.length}',
+                                style: Theme.of(context).textTheme.labelMedium
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                              ),
                             ),
                           ),
                         ),
@@ -272,7 +286,11 @@ class _TvPageState extends ConsumerState<TvPage> {
                         sliver: SliverToBoxAdapter(
                           child: _SectionHeader(
                             title: 'Toutes les chaînes',
-                            trailing: Text('${filtered.length}'),
+                            trailing: Text(
+                              '${filtered.length}',
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
                           ),
                         ),
                       ),
@@ -343,11 +361,11 @@ class _TvPageState extends ConsumerState<TvPage> {
     await Clipboard.setData(ClipboardData(text: url));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('URL copiée'),
+      const SnackBar(
+        content: Text('URL copiée'),
         behavior: SnackBarBehavior.floating,
         showCloseIcon: true,
-        duration: const Duration(seconds: 2),
+        duration: Duration(seconds: 2),
       ),
     );
   }
