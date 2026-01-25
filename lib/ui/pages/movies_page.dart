@@ -3,10 +3,13 @@ import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 import '../../../data/iptv_models.dart';
 import '../../../viewmodels/iptv_vm.dart';
 import '../../../state/favorites_store.dart';
+import '../../services/open_external.dart';
 import 'movies/movie_details_page.dart';
 import 'widgets/search_filter_bar.dart';
 
@@ -25,7 +28,6 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
   String? host;
   String sortKey = 'Name';
   bool sortAsc = true;
-
   bool listMode = false;
 
   @override
@@ -57,6 +59,83 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
   Future<void> _persistGroup(String? g) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefKeyGroup, g ?? '');
+  }
+
+  String _mediaUrl(IptvItem it) {
+    final u = (it.realUrl ?? '').trim();
+    return u.isNotEmpty ? u : it.streamUrl;
+  }
+
+  Future<void> _download(BuildContext context, IptvItem it) async {
+    final url = _mediaUrl(it);
+    final ok = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible d’ouvrir/télécharger'),
+          behavior: SnackBarBehavior.floating,
+          showCloseIcon: true,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openExternal(BuildContext context, IptvItem it) async {
+    final url = _mediaUrl(it);
+    try {
+      await ExternalPlayer.open(url);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible d’ouvrir le lecteur externe'),
+            behavior: SnackBarBehavior.floating,
+            showCloseIcon: true,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _openDetailsPage(BuildContext context, IptvItem it) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => MovieDetailsPage(item: it)));
+    });
+  }
+
+  void _showQuickDetails(BuildContext context, IptvItem it) {
+    final host = _safeHost(it.streamUrl);
+    final rating = it.imdbRating ?? 0;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(it.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if ((it.groupTitle ?? '').trim().isNotEmpty)
+              Text('Groupe: ${it.groupTitle}'),
+            if (host.isNotEmpty) Text('Host: $host'),
+            if (rating > 0) Text('IMDb: ${rating.toStringAsFixed(1)}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -129,141 +208,174 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
               .where((e) => !favIds.contains(e.id))
               .toList();
 
-          void onPick(IptvItem it) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => MovieDetailsPage(item: it)),
-              );
-            });
-          }
+          final onToggleFav = (IptvItem it) =>
+              ref.read(favoritesProvider.notifier).toggle(it.id);
 
-          return Column(
-            children: [
-              SearchFilterBar(
-                query: q,
-                onQuery: (v) => setState(() => q = v),
-                groups: allGroups,
-                selectedGroup: group,
-                onSelectGroup: (v) async {
-                  final sel = (v == null || v.isEmpty) ? null : v;
-                  setState(() => group = sel);
-                  await _persistGroup(sel);
-                },
-                hosts: allHosts,
-                selectedHost: host,
-                onSelectHost: (v) => setState(() => host = v),
-                sortKeys: const ['Name', 'Group', 'Host', 'Rating'],
-                selectedSortKey: sortKey,
-                onSelectSortKey: (v) => setState(() => sortKey = v ?? 'Name'),
-                sortAsc: sortAsc,
-                onToggleAsc: () => setState(() => sortAsc = !sortAsc),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-                child: _StatsRow(
-                  total: filtered.length,
-                  fav: favItems.length,
-                  query: q,
-                ),
-              ),
-              _GroupChipsBar(
-                groups: allGroups,
-                selected: group,
-                onSelect: (g) async {
-                  final sel = (g == null || g.isEmpty) ? null : g;
-                  setState(() => group = sel);
-                  await _persistGroup(sel);
-                },
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: filtered.isEmpty
-                    ? const _EmptyState()
-                    : CustomScrollView(
-                        slivers: [
-                          if (favItems.isNotEmpty) ...[
-                            SliverPadding(
-                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                              sliver: SliverToBoxAdapter(
-                                child: _SectionHeader(
-                                  title: 'Favoris',
-                                  count: favItems.length,
-                                ),
-                              ),
-                            ),
-                            SliverPadding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              sliver: listMode
-                                  ? _MoviesSliverList(
-                                      items: favItems,
-                                      onSelect: onPick,
-                                      isFavorite: (_) => true,
-                                      onToggleFavorite: (it) => ref
-                                          .read(favoritesProvider.notifier)
-                                          .toggle(it.id),
-                                    )
-                                  : _MoviesSliverGrid(
-                                      items: favItems,
-                                      cross: _crossCountFor(
-                                        MediaQuery.sizeOf(context).width,
-                                      ),
-                                      onSelect: onPick,
-                                      isFavorite: (_) => true,
-                                      onToggleFavorite: (it) => ref
-                                          .read(favoritesProvider.notifier)
-                                          .toggle(it.id),
-                                    ),
-                            ),
-                            const SliverToBoxAdapter(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                child: Divider(height: 1),
-                              ),
-                            ),
-                          ],
-                          SliverPadding(
-                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-                            sliver: SliverToBoxAdapter(
-                              child: _SectionHeader(
-                                title: 'Tous les films',
-                                count: otherItems.length,
-                              ),
-                            ),
-                          ),
-                          SliverPadding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            sliver: listMode
-                                ? _MoviesSliverList(
-                                    items: otherItems,
-                                    onSelect: onPick,
-                                    isFavorite: (it) => favIds.contains(it.id),
-                                    onToggleFavorite: (it) => ref
-                                        .read(favoritesProvider.notifier)
-                                        .toggle(it.id),
-                                  )
-                                : _MoviesSliverGrid(
-                                    items: otherItems,
-                                    cross: _crossCountFor(
-                                      MediaQuery.sizeOf(context).width,
-                                    ),
-                                    onSelect: onPick,
-                                    isFavorite: (it) => favIds.contains(it.id),
-                                    onToggleFavorite: (it) => ref
-                                        .read(favoritesProvider.notifier)
-                                        .toggle(it.id),
+          return LayoutBuilder(
+            builder: (c, bc) {
+              final cross = _crossCountFor(bc.maxWidth);
+
+              return Column(
+                children: [
+                  SearchFilterBar(
+                    query: q,
+                    onQuery: (v) => setState(() => q = v),
+                    groups: allGroups,
+                    selectedGroup: group,
+                    onSelectGroup: (v) async {
+                      final sel = (v == null || v.isEmpty) ? null : v;
+                      setState(() => group = sel);
+                      await _persistGroup(sel);
+                    },
+                    hosts: allHosts,
+                    selectedHost: host,
+                    onSelectHost: (v) => setState(() => host = v),
+                    sortKeys: const ['Name', 'Group', 'Host', 'Rating'],
+                    selectedSortKey: sortKey,
+                    onSelectSortKey: (v) =>
+                        setState(() => sortKey = v ?? 'Name'),
+                    sortAsc: sortAsc,
+                    onToggleAsc: () => setState(() => sortAsc = !sortAsc),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                    child: _StatsRow(
+                      total: filtered.length,
+                      fav: favItems.length,
+                      query: q,
+                    ),
+                  ),
+                  _GroupChipsBar(
+                    groups: allGroups,
+                    selected: group,
+                    onSelect: (g) async {
+                      final sel = (g == null || g.isEmpty) ? null : g;
+                      setState(() => group = sel);
+                      await _persistGroup(sel);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? const _EmptyState()
+                        : CustomScrollView(
+                            slivers: [
+                              if (favItems.isNotEmpty) ...[
+                                SliverPadding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    12,
+                                    12,
+                                    6,
                                   ),
+                                  sliver: SliverToBoxAdapter(
+                                    child: _SectionHeader(
+                                      title: 'Favoris',
+                                      count: favItems.length,
+                                    ),
+                                  ),
+                                ),
+                                SliverPadding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  sliver: listMode
+                                      ? _MoviesSliverList(
+                                          items: favItems,
+                                          isFavorite: (_) => true,
+                                          onToggleFavorite: onToggleFav,
+                                          onRead: (it) =>
+                                              _openDetailsPage(context, it),
+                                          onDetails: (it) =>
+                                              _showQuickDetails(context, it),
+                                          onExternal: (it) =>
+                                              _openExternal(context, it),
+                                          onDownload: (it) =>
+                                              _download(context, it),
+                                        )
+                                      : _MoviesSliverMasonryGrid(
+                                          items: favItems,
+                                          cross: cross,
+                                          isFavorite: (_) => true,
+                                          onToggleFavorite: onToggleFav,
+                                          onRead: (it) =>
+                                              _openDetailsPage(context, it),
+                                          onDetails: (it) =>
+                                              _showQuickDetails(context, it),
+                                          onExternal: (it) =>
+                                              _openExternal(context, it),
+                                          onDownload: (it) =>
+                                              _download(context, it),
+                                        ),
+                                ),
+                                const SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    child: Divider(height: 1),
+                                  ),
+                                ),
+                              ],
+                              SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  8,
+                                  12,
+                                  6,
+                                ),
+                                sliver: SliverToBoxAdapter(
+                                  child: _SectionHeader(
+                                    title: 'Tous les films',
+                                    count: otherItems.length,
+                                  ),
+                                ),
+                              ),
+                              SliverPadding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                sliver: listMode
+                                    ? _MoviesSliverList(
+                                        items: otherItems,
+                                        isFavorite: (it) =>
+                                            favIds.contains(it.id),
+                                        onToggleFavorite: onToggleFav,
+                                        onRead: (it) =>
+                                            _openDetailsPage(context, it),
+                                        onDetails: (it) =>
+                                            _showQuickDetails(context, it),
+                                        onExternal: (it) =>
+                                            _openExternal(context, it),
+                                        onDownload: (it) =>
+                                            _download(context, it),
+                                      )
+                                    : _MoviesSliverMasonryGrid(
+                                        items: otherItems,
+                                        cross: cross,
+                                        isFavorite: (it) =>
+                                            favIds.contains(it.id),
+                                        onToggleFavorite: onToggleFav,
+                                        onRead: (it) =>
+                                            _openDetailsPage(context, it),
+                                        onDetails: (it) =>
+                                            _showQuickDetails(context, it),
+                                        onExternal: (it) =>
+                                            _openExternal(context, it),
+                                        onDownload: (it) =>
+                                            _download(context, it),
+                                      ),
+                              ),
+                              const SliverToBoxAdapter(
+                                child: SizedBox(height: 12),
+                              ),
+                            ],
                           ),
-                          const SliverToBoxAdapter(child: SizedBox(height: 12)),
-                        ],
-                      ),
-              ),
-            ],
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -379,12 +491,14 @@ class _StatsRow extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final int count;
+
   const _SectionHeader({required this.title, required this.count});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
+
     return Row(
       children: [
         Text(
@@ -415,6 +529,7 @@ class _GroupChipsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (groups.isEmpty) return const SizedBox.shrink();
+
     return SizedBox(
       height: 48,
       child: ListView.separated(
@@ -429,6 +544,7 @@ class _GroupChipsBar extends StatelessWidget {
           final sel = (selected == null || selected!.isEmpty)
               ? isAll
               : selected == g;
+
           return ChoiceChip(
             label: Text(label, overflow: TextOverflow.ellipsis),
             selected: sel,
@@ -442,15 +558,22 @@ class _GroupChipsBar extends StatelessWidget {
 
 class _MoviesSliverList extends StatelessWidget {
   final List<IptvItem> items;
-  final void Function(IptvItem) onSelect;
   final bool Function(IptvItem) isFavorite;
   final void Function(IptvItem) onToggleFavorite;
 
+  final void Function(IptvItem) onRead;
+  final void Function(IptvItem) onDetails;
+  final void Function(IptvItem) onExternal;
+  final void Function(IptvItem) onDownload;
+
   const _MoviesSliverList({
     required this.items,
-    required this.onSelect,
     required this.isFavorite,
     required this.onToggleFavorite,
+    required this.onRead,
+    required this.onDetails,
+    required this.onExternal,
+    required this.onDownload,
   });
 
   @override
@@ -458,14 +581,16 @@ class _MoviesSliverList extends StatelessWidget {
     return SliverList(
       delegate: SliverChildBuilderDelegate((ctx, i) {
         final it = items[i];
-        final fav = isFavorite(it);
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: _MovieRowTile(
             item: it,
-            favorite: fav,
-            onTap: () => onSelect(it),
+            favorite: isFavorite(it),
             onToggleFavorite: () => onToggleFavorite(it),
+            onRead: () => onRead(it),
+            onDetails: () => onDetails(it),
+            onExternal: () => onExternal(it),
+            onDownload: () => onDownload(it),
           ),
         );
       }, childCount: items.length),
@@ -473,28 +598,78 @@ class _MoviesSliverList extends StatelessWidget {
   }
 }
 
+class _MoviesSliverMasonryGrid extends StatelessWidget {
+  final List<IptvItem> items;
+  final int cross;
+  final bool Function(IptvItem) isFavorite;
+  final void Function(IptvItem) onToggleFavorite;
+
+  final void Function(IptvItem) onRead;
+  final void Function(IptvItem) onDetails;
+  final void Function(IptvItem) onExternal;
+  final void Function(IptvItem) onDownload;
+
+  const _MoviesSliverMasonryGrid({
+    required this.items,
+    required this.cross,
+    required this.isFavorite,
+    required this.onToggleFavorite,
+    required this.onRead,
+    required this.onDetails,
+    required this.onExternal,
+    required this.onDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverMasonryGrid.count(
+      crossAxisCount: cross,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childCount: items.length,
+      itemBuilder: (ctx, i) {
+        final it = items[i];
+        return _MovieCardGrid(
+          item: it,
+          favorite: isFavorite(it),
+          onToggleFavorite: () => onToggleFavorite(it),
+          onRead: () => onRead(it),
+          onDetails: () => onDetails(it),
+          onExternal: () => onExternal(it),
+          onDownload: () => onDownload(it),
+        );
+      },
+    );
+  }
+}
+
 class _MovieRowTile extends StatelessWidget {
   final IptvItem item;
   final bool favorite;
-  final VoidCallback onTap;
+
   final VoidCallback onToggleFavorite;
+  final VoidCallback onRead;
+  final VoidCallback onDetails;
+  final VoidCallback onExternal;
+  final VoidCallback onDownload;
 
   const _MovieRowTile({
     required this.item,
     required this.favorite,
-    required this.onTap,
     required this.onToggleFavorite,
+    required this.onRead,
+    required this.onDetails,
+    required this.onExternal,
+    required this.onDownload,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final rating = item.imdbRating ?? 0;
-    final hasRating = rating > 0 && rating < 10;
     final poster = item.logo;
 
     return InkWell(
-      onTap: onTap,
+      onTap: onRead,
       borderRadius: BorderRadius.circular(14),
       child: Card(
         elevation: 0,
@@ -503,6 +678,7 @@ class _MovieRowTile extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(10),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
@@ -526,36 +702,53 @@ class _MovieRowTile extends StatelessWidget {
                   children: [
                     Text(
                       item.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
+                      overflow: TextOverflow.visible,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
+                        height: 1.15,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       item.groupTitle ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      softWrap: true,
+                      overflow: TextOverflow.visible,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    if (hasRating)
-                      Row(
-                        children: [
-                          const Icon(Icons.star, size: 16, color: Colors.amber),
-                          const SizedBox(width: 4),
-                          Text(
-                            rating.toStringAsFixed(1),
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _TinyAction(
+                          icon: Icons.menu_book,
+                          label: 'Lire',
+                          onTap: onRead,
+                        ),
+                        _TinyAction(
+                          icon: Icons.info_outline,
+                          label: 'Détails',
+                          onTap: onDetails,
+                        ),
+                        _TinyAction(
+                          icon: Icons.open_in_new,
+                          label: 'Externe',
+                          onTap: onExternal,
+                        ),
+                        _TinyAction(
+                          icon: Icons.download,
+                          label: 'Télécharger',
+                          onTap: onDownload,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
+              const SizedBox(width: 6),
               IconButton(
                 tooltip: favorite
                     ? 'Retirer des favoris'
@@ -564,7 +757,6 @@ class _MovieRowTile extends StatelessWidget {
                 icon: Icon(favorite ? Icons.star : Icons.star_border),
                 color: favorite ? Colors.amber : cs.onSurfaceVariant,
               ),
-              Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
             ],
           ),
         ),
@@ -573,71 +765,42 @@ class _MovieRowTile extends StatelessWidget {
   }
 }
 
-class _MoviesSliverGrid extends StatelessWidget {
-  final List<IptvItem> items;
-  final int cross;
-  final void Function(IptvItem) onSelect;
-  final bool Function(IptvItem) isFavorite;
-  final void Function(IptvItem) onToggleFavorite;
-
-  const _MoviesSliverGrid({
-    required this.items,
-    required this.cross,
-    required this.onSelect,
-    required this.isFavorite,
-    required this.onToggleFavorite,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverGrid(
-      delegate: SliverChildBuilderDelegate((ctx, i) {
-        final it = items[i];
-        return _MovieTileFav(
-          item: it,
-          onTap: () => onSelect(it),
-          favorite: isFavorite(it),
-          onToggleFavorite: () => onToggleFavorite(it),
-        );
-      }, childCount: items.length),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: cross,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 0.65,
-      ),
-    );
-  }
-}
-
-class _MovieTileFav extends StatelessWidget {
+class _MovieCardGrid extends StatelessWidget {
   final IptvItem item;
-  final VoidCallback onTap;
   final bool favorite;
-  final VoidCallback onToggleFavorite;
 
-  const _MovieTileFav({
+  final VoidCallback onToggleFavorite;
+  final VoidCallback onRead;
+  final VoidCallback onDetails;
+  final VoidCallback onExternal;
+  final VoidCallback onDownload;
+
+  const _MovieCardGrid({
     required this.item,
-    required this.onTap,
     required this.favorite,
     required this.onToggleFavorite,
+    required this.onRead,
+    required this.onDetails,
+    required this.onExternal,
+    required this.onDownload,
   });
 
   @override
   Widget build(BuildContext context) {
-    final rating = item.imdbRating ?? 0;
-    final hasRating = rating > 0 && rating < 10;
     final poster = item.logo;
 
     return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+      onTap: onRead,
+      borderRadius: BorderRadius.circular(14),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 2 / 3,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -647,63 +810,18 @@ class _MovieTileFav extends StatelessWidget {
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) =>
                           const ColoredBox(color: Color(0xFF111111)),
-                      loadingBuilder: (c, child, p) => p == null
-                          ? child
-                          : const Center(
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            ),
                     )
                   else
                     const ColoredBox(color: Color(0xFF111111)),
-
-                  if (hasRating)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              size: 14,
-                              color: Colors.amber,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              rating.toStringAsFixed(1),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
                   Positioned(
-                    left: 6,
-                    top: 6,
+                    left: 8,
+                    top: 8,
                     child: Material(
                       color: Colors.black.withOpacity(0.35),
                       shape: const CircleBorder(),
                       child: IconButton(
                         constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(7),
                         iconSize: 18,
                         tooltip: favorite
                             ? 'Retirer des favoris'
@@ -716,21 +834,154 @@ class _MovieTileFav extends StatelessWidget {
                       ),
                     ),
                   ),
+                  Positioned(
+                    left: 8,
+                    right: 8,
+                    bottom: 8,
+                    child: _GridActionsBar(
+                      onRead: onRead,
+                      onDetails: onDetails,
+                      onExternal: onExternal,
+                      onDownload: onDownload,
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 2),
-          Text(
-            item.groupTitle ?? '',
-            style: Theme.of(context).textTheme.bodySmall,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    item.groupTitle ?? '',
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _GridActionsBar extends StatelessWidget {
+  final VoidCallback onRead;
+  final VoidCallback onDetails;
+  final VoidCallback onExternal;
+  final VoidCallback onDownload;
+
+  const _GridActionsBar({
+    required this.onRead,
+    required this.onDetails,
+    required this.onExternal,
+    required this.onDownload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withOpacity(0.48),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _IconMini(icon: Icons.menu_book, tooltip: 'Lire', onTap: onRead),
+            _IconMini(
+              icon: Icons.info_outline,
+              tooltip: 'Détails',
+              onTap: onDetails,
+            ),
+            _IconMini(
+              icon: Icons.open_in_new,
+              tooltip: 'Externe',
+              onTap: onExternal,
+            ),
+            _IconMini(
+              icon: Icons.download,
+              tooltip: 'Télécharger',
+              onTap: onDownload,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TinyAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _TinyAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Material(
+      color: cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: cs.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(label, style: Theme.of(context).textTheme.labelMedium),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IconMini extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _IconMini({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      iconSize: 18,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      icon: Icon(icon, color: Colors.white),
     );
   }
 }

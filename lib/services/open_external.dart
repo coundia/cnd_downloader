@@ -1,13 +1,10 @@
 import 'dart:io';
-
 import 'package:url_launcher/url_launcher.dart';
 
 final class ExternalPlayer {
   static Future<void> open(String url) async {
     final cleanUrl = url.trim();
-    if (cleanUrl.isEmpty) {
-      throw ArgumentError('url is empty');
-    }
+    if (cleanUrl.isEmpty) throw ArgumentError('url is empty');
 
     if (Platform.isMacOS) {
       if (await _openMacApp('VLC', cleanUrl)) return;
@@ -28,16 +25,6 @@ final class ExternalPlayer {
       return;
     }
 
-    if (Platform.isAndroid) {
-      await _openDefault(cleanUrl);
-      return;
-    }
-
-    if (Platform.isIOS) {
-      await _openDefault(cleanUrl);
-      return;
-    }
-
     await _openDefault(cleanUrl);
   }
 
@@ -46,9 +33,7 @@ final class ExternalPlayer {
       Uri.parse(url),
       mode: LaunchMode.externalApplication,
     );
-    if (!ok) {
-      throw Exception('Cannot open url');
-    }
+    if (!ok) throw Exception('Cannot open url');
   }
 
   static Future<bool> _openMacApp(String appName, String url) async {
