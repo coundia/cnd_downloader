@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/iptv_models.dart';
 import '../../core/settings.dart';
+import '../../services/open_external.dart';
 import '../../viewmodels/iptv_vm.dart';
 import '../../state/favorites_store.dart';
 import '../widgets/cnd_video_player.dart';
@@ -482,6 +483,9 @@ class _ChannelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final url = (item.realUrl ?? '').isNotEmpty
+        ? item.realUrl!
+        : item.streamUrl;
 
     return InkWell(
       onTap: onPlay,
@@ -523,7 +527,7 @@ class _ChannelCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 6),
+
               IconButton(
                 tooltip: isFavorite
                     ? 'Retirer des favoris'
@@ -533,11 +537,16 @@ class _ChannelCard extends StatelessWidget {
                 color: isFavorite ? Colors.amber : cs.onSurfaceVariant,
               ),
               IconButton(
+                tooltip: 'Ouvrir externe',
+                onPressed: () => ExternalPlayer.open(url),
+                icon: Icon(Icons.open_in_new, color: cs.onSurfaceVariant),
+              ),
+              IconButton(
                 tooltip: 'Copier l’URL',
                 onPressed: onCopy,
                 icon: Icon(Icons.link, color: cs.onSurfaceVariant),
               ),
-              const SizedBox(width: 4),
+
               Icon(Icons.play_circle_fill, color: cs.primary),
             ],
           ),
