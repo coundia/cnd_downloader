@@ -29,6 +29,7 @@ class CndVideoPlayer extends StatefulWidget {
 
 class _CndVideoPlayerState extends State<CndVideoPlayer> {
   VideoPlayerController? _c;
+
   bool _show = true;
   Timer? _hideT;
   Timer? _stallT;
@@ -42,6 +43,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   double _lastVol = 1.0;
   final List<double> _speeds = const [0.5, 1.0, 1.25, 1.5, 2.0];
   int _speedIx = 1;
+
   Duration _lastPos = Duration.zero;
   DateTime _lastAdvance = DateTime.now();
 
@@ -94,6 +96,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         c.value.duration != Duration.zero) {
       await c.seekTo(widget.startAt!);
     }
+
     _lastVol = _lastVol <= 0 ? 1.0 : _lastVol;
     await c.setVolume(_lastVol);
     await c.setPlaybackSpeed(_speeds[_speedIx]);
@@ -123,7 +126,6 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
   void _disposeCtrl() {
     final c = _c;
     _c = null;
-    c?.removeListener(() {});
     c?.dispose();
   }
 
@@ -215,6 +217,7 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     try {
       await old.pause();
     } catch (_) {}
+
     _disposeCtrl();
 
     final base = Uri.parse(widget.url);
@@ -242,8 +245,10 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         await c.seekTo(resume);
       } catch (_) {}
     }
+
     await c.setPlaybackSpeed(spd);
     await c.setVolume(vol <= 0 ? _lastVol : vol);
+
     if (wasPlaying || widget.autoPlay) {
       try {
         await c.play();
@@ -348,8 +353,10 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     if (c == null) return;
     final wasPlaying = c.value.isPlaying;
     final pos = c.value.position;
+
     _hideT?.cancel();
     await c.pause();
+
     final key = GlobalKey<_CndVideoPlayerState>();
     final returnedPos = await Navigator.of(context).push<Duration?>(
       PageRouteBuilder(
@@ -366,9 +373,12 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
             FadeTransition(opacity: a, child: child),
       ),
     );
+
     if (!mounted) return;
+
     final resumeAt = returnedPos ?? pos;
     await c.seekTo(resumeAt);
+
     if (wasPlaying) {
       await c.play();
       _show = true;
@@ -417,6 +427,21 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
     if (c == null) return;
     _speedIx = (_speedIx + 1) % _speeds.length;
     await c.setPlaybackSpeed(_speeds[_speedIx]);
+    setState(() => _show = true);
+    _kickAutoHide();
+  }
+
+  Future<void> _copyUrl() async {
+    await Clipboard.setData(ClipboardData(text: widget.url));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('URL copiée'),
+        behavior: SnackBarBehavior.floating,
+        showCloseIcon: true,
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -461,237 +486,8 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
         final showGoLive =
             live && DateTime.now().difference(_lastAdvance).inSeconds >= 3;
 
-        final controls = FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!live)
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        LinearProgressIndicator(
-                          value: bufferRatio.clamp(0.0, 1.0),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Colors.white54,
-                          ),
-                          backgroundColor: Colors.white24,
-                          minHeight: 2.5,
-                        ),
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 2.5,
-                            thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 6,
-                            ),
-                            trackShape: const RectangularSliderTrackShape(),
-                            overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 12,
-                            ),
-                            activeTrackColor: Colors.white,
-                            inactiveTrackColor: Colors.transparent,
-                            thumbColor: Colors.white,
-                          ),
-                          child: Slider(
-                            value: ratio.clamp(0.0, 1.0),
-                            onChanged: (v) {
-                              final ms = (dur.inMilliseconds * v).toInt();
-                              controller.seekTo(Duration(milliseconds: ms));
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  Row(
-                    children: [
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        iconSize: 24,
-                        onPressed: _togglePlay,
-                        icon: Icon(
-                          v.isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: Colors.white,
-                        ),
-                        tooltip: v.isPlaying ? 'Pause' : 'Play',
-                      ),
-                      const SizedBox(width: 6),
-                      if (!live) ...[
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          iconSize: 22,
-                          onPressed: () =>
-                              _seekBy(const Duration(seconds: -10)),
-                          icon: const Icon(
-                            Icons.replay_10,
-                            color: Colors.white,
-                          ),
-                          tooltip: '-10s',
-                        ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          iconSize: 22,
-                          onPressed: () => _seekBy(const Duration(seconds: 10)),
-                          icon: const Icon(
-                            Icons.forward_10,
-                            color: Colors.white,
-                          ),
-                          tooltip: '+10s',
-                        ),
-                      ],
-                      const SizedBox(width: 10),
-                      if (!live)
-                        Text(
-                          '${_fmt(pos)} / ${_fmt(dur)}  •  -${_fmt(dur - pos)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                        )
-                      else
-                        Row(
-                          children: [
-                            const Text(
-                              'LIVE',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                            if (showGoLive)
-                              TextButton(
-                                onPressed: () =>
-                                    _restartStream(fromStart: false),
-                                child: const Text(
-                                  'Go Live',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                          ],
-                        ),
-                      const Spacer(),
-                      // Mini-player button using local PIPView
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        iconSize: 22,
-                        onPressed: () => PIPView.of(pipContext)?.presentBelow(
-                          _PipBottom(
-                            onClose: () =>
-                                PIPView.of(pipContext)?.stopFloating(),
-                          ),
-                        ),
-                        icon: const Icon(
-                          Icons.picture_in_picture_alt_rounded,
-                          color: Colors.white,
-                        ),
-                        tooltip: 'Mini-lecteur',
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        iconSize: 22,
-                        onPressed: _showDebug,
-                        icon: const Icon(Icons.bug_report, color: Colors.white),
-                        tooltip: 'Debug',
-                      ),
-
-                      const SizedBox(width: 4),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        iconSize: 22,
-                        onPressed: _replay,
-                        icon: const Icon(Icons.replay, color: Colors.white),
-                        tooltip: 'Rejouer',
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        iconSize: 20,
-                        onPressed: _toggleMute,
-                        icon: Icon(
-                          v.volume > 0 ? Icons.volume_up : Icons.volume_off,
-                          color: Colors.white,
-                        ),
-                        tooltip: v.volume > 0 ? 'Mute' : 'Unmute',
-                      ),
-                      SizedBox(
-                        width: 80,
-                        height: 24,
-                        child: SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 2.0,
-                            thumbShape: const RoundSliderThumbShape(
-                              enabledThumbRadius: 6,
-                            ),
-                            overlayShape: const RoundSliderOverlayShape(
-                              overlayRadius: 12,
-                            ),
-                            activeTrackColor: Colors.white,
-                            inactiveTrackColor: Colors.white24,
-                            thumbColor: Colors.white,
-                            overlayColor: Colors.white30,
-                          ),
-                          child: Slider(
-                            value: v.volume.clamp(0.0, 1.0),
-                            min: 0.0,
-                            max: 1.0,
-                            onChanged: (vol) {
-                              controller.setVolume(vol);
-                              if (vol > 0) _lastVol = vol;
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      TextButton(
-                        onPressed: _cycleSpeed,
-                        child: Text(
-                          '${_speeds[_speedIx]}x',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        iconSize: 22,
-                        onPressed: widget.isFullscreen
-                            ? () {
-                                final p = _c?.value.position ?? Duration.zero;
-                                Navigator.of(context).pop<Duration?>(p);
-                              }
-                            : _enterFullscreen,
-                        icon: Icon(
-                          widget.isFullscreen
-                              ? Icons.fullscreen_exit
-                              : Icons.fullscreen,
-                          color: Colors.white,
-                        ),
-                        tooltip: widget.isFullscreen
-                            ? 'Exit full screen'
-                            : 'Full screen',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-
         final aspect = v.aspectRatio == 0 ? (16 / 9) : v.aspectRatio;
+
         return AspectRatio(
           aspectRatio: aspect,
           child: Container(
@@ -716,40 +512,146 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
                 fit: StackFit.expand,
                 children: [
                   VideoPlayer(controller),
+
                   if (v.isBuffering && !_restarting)
                     const Center(
                       child: SizedBox(
-                        width: 24,
-                        height: 24,
+                        width: 28,
+                        height: 28,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white,
                         ),
                       ),
                     ),
-                  Positioned(
-                    left: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(6),
+
+                  if (!isFloating)
+                    Positioned(
+                      left: 10,
+                      top: 10,
+                      child: AnimatedOpacity(
+                        opacity: _show ? 1 : 0,
+                        duration: const Duration(milliseconds: 180),
+                        child: Row(
+                          children: [
+                            _Pill(
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.wifi_tethering,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    live
+                                        ? 'LIVE'
+                                        : '${_fmt(pos)} / ${_fmt(dur)}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (!live)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: _Pill(
+                                  child: Text(
+                                    '${_speeds[_speedIx]}x',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
+
                   if (_show && !isFloating)
                     Positioned(
-                      left: 8,
-                      right: 8,
-                      bottom: 8,
-                      child: Material(
-                        color: Colors.black.withOpacity(0.35),
-                        borderRadius: BorderRadius.circular(8),
-                        child: controls,
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: IgnorePointer(
+                        ignoring: false,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withOpacity(0.45),
+                                Colors.transparent,
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.60),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  if (_show && !isFloating)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                          child: _ControlsBar(
+                            isLive: live,
+                            isPlaying: v.isPlaying,
+                            isFullscreen: widget.isFullscreen,
+                            volume: v.volume.clamp(0.0, 1.0),
+                            ratio: ratio.clamp(0.0, 1.0),
+                            bufferRatio: bufferRatio.clamp(0.0, 1.0),
+                            position: pos,
+                            duration: dur,
+                            showGoLive: showGoLive,
+                            onPlayPause: _togglePlay,
+                            onBack10: () =>
+                                _seekBy(const Duration(seconds: -10)),
+                            onFwd10: () => _seekBy(const Duration(seconds: 10)),
+                            onGoLive: () => _restartStream(fromStart: false),
+                            onReplay: _replay,
+                            onMute: _toggleMute,
+                            onSpeed: _cycleSpeed,
+                            onCopy: _copyUrl,
+                            onPip: () => PIPView.of(pipContext)?.presentBelow(
+                              _PipBottom(
+                                onClose: () =>
+                                    PIPView.of(pipContext)?.stopFloating(),
+                              ),
+                            ),
+                            onFullscreen: widget.isFullscreen
+                                ? () {
+                                    final p =
+                                        _c?.value.position ?? Duration.zero;
+                                    Navigator.of(context).pop<Duration?>(p);
+                                  }
+                                : _enterFullscreen,
+                            onSeek: (v) {
+                              if (live) return;
+                              final ms = (dur.inMilliseconds * v).toInt();
+                              controller.seekTo(Duration(milliseconds: ms));
+                            },
+                            onVolume: (vol) {
+                              controller.setVolume(vol);
+                              if (vol > 0) _lastVol = vol;
+                            },
+                            fmt: _fmt,
+                            speedLabel: '${_speeds[_speedIx]}x',
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -805,6 +707,273 @@ class _CndVideoPlayerState extends State<CndVideoPlayer> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  final Widget child;
+  const _Pill({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.45),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _ControlsBar extends StatelessWidget {
+  final bool isLive;
+  final bool isPlaying;
+  final bool isFullscreen;
+
+  final double volume;
+
+  final double ratio;
+  final double bufferRatio;
+
+  final Duration position;
+  final Duration duration;
+
+  final bool showGoLive;
+
+  final VoidCallback onPlayPause;
+  final VoidCallback onBack10;
+  final VoidCallback onFwd10;
+  final VoidCallback onGoLive;
+  final VoidCallback onReplay;
+  final VoidCallback onMute;
+  final VoidCallback onSpeed;
+  final VoidCallback onCopy;
+  final VoidCallback onPip;
+  final VoidCallback onFullscreen;
+
+  final void Function(double) onSeek;
+  final void Function(double) onVolume;
+
+  final String Function(Duration) fmt;
+  final String speedLabel;
+
+  const _ControlsBar({
+    required this.isLive,
+    required this.isPlaying,
+    required this.isFullscreen,
+    required this.volume,
+    required this.ratio,
+    required this.bufferRatio,
+    required this.position,
+    required this.duration,
+    required this.showGoLive,
+    required this.onPlayPause,
+    required this.onBack10,
+    required this.onFwd10,
+    required this.onGoLive,
+    required this.onReplay,
+    required this.onMute,
+    required this.onSpeed,
+    required this.onCopy,
+    required this.onPip,
+    required this.onFullscreen,
+    required this.onSeek,
+    required this.onVolume,
+    required this.fmt,
+    required this.speedLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+
+    return Material(
+      color: Colors.black.withOpacity(0.35),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!isLive)
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: bufferRatio,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.white54,
+                      ),
+                      backgroundColor: Colors.white24,
+                      minHeight: 3,
+                    ),
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 3,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 7,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 14,
+                      ),
+                      activeTrackColor: Colors.white,
+                      inactiveTrackColor: Colors.transparent,
+                      thumbColor: Colors.white,
+                      overlayColor: Colors.white24,
+                    ),
+                    child: Slider(value: ratio, onChanged: onSeek),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _IconBtn(
+                  icon: isPlaying ? Icons.pause : Icons.play_arrow,
+                  tooltip: isPlaying ? 'Pause' : 'Play',
+                  onTap: onPlayPause,
+                ),
+                if (!isLive) ...[
+                  const SizedBox(width: 6),
+                  _IconBtn(
+                    icon: Icons.replay_10,
+                    tooltip: '-10s',
+                    onTap: onBack10,
+                  ),
+                  const SizedBox(width: 4),
+                  _IconBtn(
+                    icon: Icons.forward_10,
+                    tooltip: '+10s',
+                    onTap: onFwd10,
+                  ),
+                ],
+                const SizedBox(width: 10),
+                if (!isLive)
+                  Text(
+                    '${fmt(position)} / ${fmt(duration)}',
+                    style: t.labelMedium?.copyWith(color: Colors.white),
+                  )
+                else
+                  Row(
+                    children: [
+                      Text(
+                        'LIVE',
+                        style: t.labelMedium?.copyWith(color: Colors.white),
+                      ),
+                      if (showGoLive)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: TextButton(
+                            onPressed: onGoLive,
+                            child: const Text(
+                              'Go Live',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                const Spacer(),
+                _IconBtn(
+                  icon: Icons.copy,
+                  tooltip: 'Copier URL',
+                  onTap: onCopy,
+                ),
+                const SizedBox(width: 2),
+                _IconBtn(
+                  icon: Icons.picture_in_picture_alt_rounded,
+                  tooltip: 'Mini-lecteur',
+                  onTap: onPip,
+                ),
+                const SizedBox(width: 2),
+                _IconBtn(
+                  icon: Icons.replay,
+                  tooltip: 'Rejouer',
+                  onTap: onReplay,
+                ),
+                const SizedBox(width: 2),
+                _IconBtn(
+                  icon: volume > 0 ? Icons.volume_up : Icons.volume_off,
+                  tooltip: volume > 0 ? 'Mute' : 'Unmute',
+                  onTap: onMute,
+                ),
+                SizedBox(
+                  width: 86,
+                  height: 26,
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 2,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 6,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 12,
+                      ),
+                      activeTrackColor: Colors.white,
+                      inactiveTrackColor: Colors.white24,
+                      thumbColor: Colors.white,
+                      overlayColor: Colors.white24,
+                    ),
+                    child: Slider(
+                      value: volume,
+                      min: 0.0,
+                      max: 1.0,
+                      onChanged: onVolume,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                TextButton(
+                  onPressed: onSpeed,
+                  child: Text(
+                    speedLabel,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                _IconBtn(
+                  icon: isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  tooltip: isFullscreen ? 'Exit full screen' : 'Full screen',
+                  onTap: onFullscreen,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IconBtn extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _IconBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      icon: Icon(icon, color: Colors.white),
+      iconSize: 22,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
     );
   }
 }
@@ -882,24 +1051,72 @@ class _FullscreenVideoState extends State<_FullscreenVideo> {
   }
 }
 
-// Optional bottom content shown when mini-player is active
 class _PipBottom extends StatelessWidget {
   final VoidCallback onClose;
   const _PipBottom({required this.onClose});
 
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: const Text('Mode mini lecteur'),
         actions: [
-          IconButton(icon: const Icon(Icons.close), onPressed: onClose),
+          IconButton(
+            tooltip: 'Fermer',
+            icon: const Icon(Icons.close),
+            onPressed: onClose,
+          ),
         ],
       ),
-      body: const Center(
-        child: Text(
-          'Continuez votre navigation.\nTouchez le mini lecteur pour le fermer.',
-          textAlign: TextAlign.center,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.picture_in_picture_alt_rounded,
+                  size: 44,
+                  color: Colors.white,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Mini lecteur activé',
+                  textAlign: TextAlign.center,
+                  style: t.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Continuez votre navigation.\nTouchez le mini lecteur pour le fermer.',
+                  textAlign: TextAlign.center,
+                  style: t.bodyMedium?.copyWith(
+                    color: Colors.white.withOpacity(0.82),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.tonal(
+                  onPressed: onClose,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.12),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Fermer le mini lecteur'),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
