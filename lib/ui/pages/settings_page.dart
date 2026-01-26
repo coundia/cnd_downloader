@@ -1,3 +1,4 @@
+// lib/ui/pages/settings_page.dart
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,27 +55,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final vm = ref.read(settingsVmProvider.notifier);
 
     return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
       body: AbsorbPointer(
         absorbing: _saving,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            _sectionTitle(context, 'Download'),
+            const SizedBox(height: 10),
             _numField(segCtrl, 'Segments per file'),
             const SizedBox(height: 12),
-            _numField(partCtrl, 'Part size MB'),
+            _numField(partCtrl, 'Part size (MB)'),
             const SizedBox(height: 12),
             _numField(maxCtrl, 'Max active files'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: uaCtrl,
-              decoration: const InputDecoration(labelText: 'User-Agent'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: refCtrl,
-              decoration: const InputDecoration(labelText: 'Referer'),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+
             Row(
               children: [
                 Expanded(
@@ -99,7 +94,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ],
             ),
+
+            const SizedBox(height: 22),
+            _sectionTitle(context, 'HTTP headers'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: uaCtrl,
+              decoration: const InputDecoration(labelText: 'User-Agent'),
+            ),
             const SizedBox(height: 12),
+            TextField(
+              controller: refCtrl,
+              decoration: const InputDecoration(labelText: 'Referer'),
+            ),
+
+            const SizedBox(height: 22),
+            _sectionTitle(context, 'Metadata'),
+            const SizedBox(height: 10),
             TextField(
               controller: omdbCtrl,
               obscureText: _obscureOmdb,
@@ -116,7 +127,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+
+            const SizedBox(height: 22),
             FilledButton(
               onPressed: _saving
                   ? null
@@ -124,27 +136,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       FocusScope.of(context).unfocus();
                       setState(() => _saving = true);
                       try {
+                        final current = ref.read(settingsVmProvider);
+
                         vm.setSegments(
-                          int.tryParse(segCtrl.text) ??
-                              ref.read(settingsVmProvider).segmentsPerFile,
+                          int.tryParse(segCtrl.text) ?? current.segmentsPerFile,
                         );
-                        vm.setPartSize(
-                          (((double.tryParse(partCtrl.text) ??
-                                      (ref
-                                              .read(settingsVmProvider)
-                                              .partSizeBytes /
-                                          (1024 * 1024)))) *
-                                  1024 *
-                                  1024)
-                              .toInt(),
-                        );
+                        final mb =
+                            double.tryParse(partCtrl.text) ??
+                            (current.partSizeBytes / (1024 * 1024));
+                        vm.setPartSize((mb * 1024 * 1024).toInt());
                         vm.setMaxActive(
-                          int.tryParse(maxCtrl.text) ??
-                              ref.read(settingsVmProvider).maxActiveFiles,
+                          int.tryParse(maxCtrl.text) ?? current.maxActiveFiles,
                         );
                         vm.setUa(
                           uaCtrl.text.trim().isEmpty
-                              ? ref.read(settingsVmProvider).defaultUserAgent
+                              ? current.defaultUserAgent
                               : uaCtrl.text.trim(),
                         );
                         vm.setReferer(
@@ -162,6 +168,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               ? null
                               : omdbCtrl.text.trim(),
                         );
+
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Settings saved')),
@@ -180,6 +187,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(BuildContext context, String title) {
+    final cs = Theme.of(context).colorScheme;
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w800,
+        color: cs.onSurface,
       ),
     );
   }

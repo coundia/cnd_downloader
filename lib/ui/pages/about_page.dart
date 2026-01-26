@@ -34,7 +34,7 @@ class AboutPage extends StatelessWidget {
                   radius: 44,
                   backgroundColor: Colors.white10,
                   child: Text(
-                    'SEN IPTV',
+                    'CND IPTV',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
