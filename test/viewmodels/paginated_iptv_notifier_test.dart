@@ -38,11 +38,16 @@ class FakeIptvRepository extends Fake implements IptvRepository {
 
     // Filter by query
     if (query.isNotEmpty) {
-      result = result
-          .where((e) =>
-              e.name.toLowerCase().contains(query.toLowerCase()) ||
-              (e.groupTitle ?? '').toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      final terms = query.trim().split(RegExp(r'\s+')).where((t) => t.isNotEmpty);
+      result = result.where((e) {
+        for (final term in terms) {
+          final t = term.toLowerCase();
+          final match = e.name.toLowerCase().contains(t) || 
+                        (e.groupTitle ?? '').toLowerCase().contains(t);
+          if (!match) return false;
+        }
+        return true;
+      }).toList();
     }
 
     // Filter by group
@@ -132,6 +137,29 @@ void main() {
       expect(notifier.state.items.isNotEmpty, true);
       expect(notifier.state.query, 'Item 2');
       expect(notifier.state.offset, notifier.state.items.length);
+    });
+
+    test('filtering by multi-term query', () async {
+      await Future.delayed(Duration.zero);
+      
+      // "Item A" -> Matches "Item" (all) AND "A" (only in 'Group A')
+      // Movies are even numbers.
+      // i even AND i%3==0 => i%6==0.
+      // 6, 12, 18, 24, 30, 36, 42, 48 ... 
+      // Should find items.
+      // But "Item 2" (i=2, group=B) should NOT match.
+      
+      await notifier.setQuery('Item A');
+      
+      expect(notifier.state.items.isNotEmpty, true);
+      
+      // Verify "Item 2" is NOT present (as it is in Group B)
+      final hasItem2 = notifier.state.items.any((e) => e.name == 'Item 2');
+      expect(hasItem2, false);
+
+      // Verify "Item 6" IS present (as it is in Group A)
+      final hasItem6 = notifier.state.items.any((e) => e.name == 'Item 6');
+      expect(hasItem6, true);
     });
 
     test('filtering by group', () async {

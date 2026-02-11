@@ -171,9 +171,6 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
       ),
       body: Stack(
         children: [
-        if (vmState.items.isEmpty && !vmState.isLoading)
-             const _EmptyState()
-        else
           NotificationListener<ScrollNotification>(
             onNotification: (ScrollNotification scrollInfo) {
               if (!vmState.isLoading && 
@@ -207,14 +204,14 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                              return SearchFilterBar(
                                 query: vmState.query,
                                 onQuery: (v) => ref.read(moviesVmProvider.notifier).setQuery(v),
-                                groups: snapshotGroups.data ?? [],
+                                groups: ['', ...?snapshotGroups.data],
                                 selectedGroup: vmState.group,
                                 onSelectGroup: (v) async {
                                   final sel = (v == null || v.isEmpty) ? null : v;
                                   ref.read(moviesVmProvider.notifier).setGroup(sel);
                                   await _persistGroup(sel);
                                 },
-                                hosts: snapshotHosts.data ?? [],
+                                hosts: ['', ...?snapshotHosts.data],
                                 selectedHost: vmState.host,
                                 onSelectHost: (v) => ref.read(moviesVmProvider.notifier).setHost(v),
                                 sortKeys: const ['Name', 'Group', 'Host', 'Rating'],
@@ -225,7 +222,7 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                                 onToggleAsc: () => ref.read(moviesVmProvider.notifier).setSort(vmState.sortKey, !vmState.sortAsc),
                               );
                            }
-                        );
+                         );
                       }
                     ),
                     Padding(
@@ -256,7 +253,13 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                     const Divider(height: 1),
                     Expanded(
                       child: vmState.items.isEmpty
-                          ? const _EmptyState()
+                          ? _EmptyState(
+                              onClear: () {
+                                ref.read(moviesVmProvider.notifier).setQuery('');
+                                ref.read(moviesVmProvider.notifier).setGroup(null);
+                                ref.read(moviesVmProvider.notifier).setHost(null);
+                              },
+                            )
                           : CustomScrollView(
                               slivers: [
                                 if (favItems.isNotEmpty) ...[
@@ -976,19 +979,29 @@ class _PageError extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final VoidCallback? onClear;
+  const _EmptyState({this.onClear});
+
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.movie_outlined, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text(
+          const Icon(Icons.movie_outlined, size: 64, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text(
             'Aucun film trouvé',
             style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
+          if (onClear != null) ...[
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: onClear,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Effacer les filtres'),
+            ),
+          ],
         ],
       ),
     );

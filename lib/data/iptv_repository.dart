@@ -28,11 +28,13 @@ class IptvRepository {
     var q = _isar.iptvItems.filter().kindEqualTo(kind);
 
     if (query.trim().isNotEmpty) {
-      final term = query.trim();
-      q = q.and().group((q) => q
-          .nameContains(term, caseSensitive: false)
-          .or()
-          .groupTitleContains(term, caseSensitive: false));
+      final terms = query.trim().split(RegExp(r'\s+')).where((t) => t.isNotEmpty);
+      for (final term in terms) {
+        q = q.and().group((q) => q
+            .nameContains(term, caseSensitive: false)
+            .or()
+            .groupTitleContains(term, caseSensitive: false));
+      }
     }
     
     if (group != null && group.isNotEmpty) {

@@ -54,7 +54,7 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
   @override
   void didUpdateWidget(covariant SearchFilterBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.query != _ctrl.text) {
+    if (widget.query != oldWidget.query && widget.query != _ctrl.text) {
       _ctrl.text = widget.query;
       _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
     }
@@ -71,7 +71,7 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
   void _onControllerChanged() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 220), () {
-      widget.onQuery(_ctrl.text.trim());
+      widget.onQuery(_ctrl.text);
     });
   }
 
@@ -86,7 +86,7 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
         child: TextField(
           controller: _ctrl,
           textInputAction: TextInputAction.search,
-          onSubmitted: (v) => widget.onQuery(v.trim()),
+          onSubmitted: (v) => widget.onQuery(v),
           autocorrect: false,
           enableSuggestions: false,
           smartDashesType: SmartDashesType.disabled,
@@ -166,6 +166,23 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
       ),
     );
 
+    final hasFilter = (widget.selectedGroup != null && widget.selectedGroup!.isNotEmpty) ||
+        (widget.selectedHost != null && widget.selectedHost!.isNotEmpty);
+
+    final clearFiltersBtn = hasFilter
+        ? Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: IconButton(
+              tooltip: 'Clear filters',
+              onPressed: () {
+                widget.onSelectGroup(null);
+                widget.onSelectHost(null);
+              },
+              icon: const Icon(Icons.filter_alt_off),
+            ),
+          )
+        : const SizedBox.shrink();
+
     return Material(
       color: Theme.of(context).colorScheme.surface,
       child: Padding(
@@ -181,7 +198,12 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
                   queryField,
                   const SizedBox(height: 8),
                   Row(
-                    children: [groupField, const SizedBox(width: 8), hostField],
+                    children: [
+                      groupField,
+                      const SizedBox(width: 8),
+                      hostField,
+                      if (hasFilter) clearFiltersBtn,
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -202,6 +224,7 @@ class _SearchFilterBarState extends State<SearchFilterBar> {
                 groupField,
                 const SizedBox(width: 8),
                 hostField,
+                if (hasFilter) clearFiltersBtn,
                 const SizedBox(width: 8),
                 sortField,
                 const SizedBox(width: 8),

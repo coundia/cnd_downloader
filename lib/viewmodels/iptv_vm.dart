@@ -97,47 +97,55 @@ class PaginatedIptvNotifier extends StateNotifier<PaginatedIptvState> {
 
   Future<void> setQuery(String q) async {
     if (state.query == q) return;
-    _resetState(query: q);
+    state = state.copyWith(query: q, offset: 0, hasMore: true, isLoading: true);
     await _reload();
   }
 
   Future<void> setGroup(String? g) async {
     if (state.group == g) return;
-    _resetState(group: g);
+    // Manual copy because copyWith ignores nulls for nullable fields
+    state = PaginatedIptvState(
+      items: state.items,
+      isLoading: true,
+      hasMore: true,
+      offset: 0,
+      query: state.query,
+      group: g,
+      host: state.host,
+      sortKey: state.sortKey,
+      sortAsc: state.sortAsc,
+    );
     await _reload();
   }
 
   Future<void> setHost(String? h) async {
     if (state.host == h) return;
-    _resetState(host: h);
+    // Manual copy because copyWith ignores nulls for nullable fields
+    state = PaginatedIptvState(
+      items: state.items,
+      isLoading: true,
+      hasMore: true,
+      offset: 0,
+      query: state.query,
+      group: state.group,
+      host: h,
+      sortKey: state.sortKey,
+      sortAsc: state.sortAsc,
+    );
     await _reload();
   }
 
   Future<void> setSort(String key, bool asc) async {
     if (state.sortKey == key && state.sortAsc == asc) return;
-    _resetState(sortKey: key, sortAsc: asc);
+    state = state.copyWith(sortKey: key, sortAsc: asc, offset: 0, hasMore: true, isLoading: true);
     await _reload();
   }
 
-  void _resetState({
-    String? query,
-    String? group,
-    String? host,
-    String? sortKey,
-    bool? sortAsc,
-  }) {
-    state = PaginatedIptvState(
-      query: query ?? state.query,
-      group: group ?? state.group,
-      host: host ?? state.host,
-      sortKey: sortKey ?? state.sortKey,
-      sortAsc: sortAsc ?? state.sortAsc,
-      isLoading: true,
-    );
-  }
+  // _resetState is no longer needed in its previous form or can be simplified
+  // ensuring we don't clear items aggressively.
 
   Future<void> refresh() async {
-    _resetState();
+    state = state.copyWith(offset: 0, hasMore: true, isLoading: true);
     await _reload();
   }
   
