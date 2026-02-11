@@ -48,6 +48,19 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     SettingsPage(key: PageStorageKey('settings')),
   ];
 
+  final _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onItemTapped(int index) {
+      setState(() => this.index = index);
+      _pageController.jumpToPage(index); 
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -75,7 +88,7 @@ class _ShellPageState extends ConsumerState<ShellPage> {
               children: [
                 NavigationRail(
                   selectedIndex: index,
-                  onDestinationSelected: (v) => setState(() => index = v),
+                  onDestinationSelected: _onItemTapped,
                   labelType: NavigationRailLabelType.all,
                   destinations: const [
                     NavigationRailDestination(
@@ -112,7 +125,11 @@ class _ShellPageState extends ConsumerState<ShellPage> {
                 Expanded(
                   child: PageStorage(
                     bucket: bucket,
-                    child: IndexedStack(index: index, children: pages),
+                    child: PageView(
+                       controller: _pageController,
+                       physics: const NeverScrollableScrollPhysics(),
+                       children: pages,
+                    ),
                   ),
                 ),
               ],
@@ -124,11 +141,15 @@ class _ShellPageState extends ConsumerState<ShellPage> {
           appBar: AppBar(title: Text(_titles[index]), actions: actions),
           body: PageStorage(
             bucket: bucket,
-            child: IndexedStack(index: index, children: pages),
+            child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: pages,
+            ),
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: index,
-            onDestinationSelected: (v) => setState(() => index = v),
+            onDestinationSelected: _onItemTapped,
             destinations: const [
               NavigationDestination(icon: Icon(Icons.live_tv), label: 'TV'),
               NavigationDestination(

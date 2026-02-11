@@ -178,8 +178,9 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final items = ref.watch(seriesProvider);
-
+    // OLD: final items = ref.watch(seriesProvider);
+    final vmState = ref.watch(seriesVmProvider);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Séries'),
@@ -188,7 +189,11 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: TextField(
-              onChanged: (v) => setState(() => q = v.trim().toLowerCase()),
+              onChanged: (v) {
+                final val = v.trim().toLowerCase();
+                setState(() => q = val);
+                ref.read(seriesVmProvider.notifier).setQuery(val);
+              },
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search),
                 hintText: 'Rechercher séries',
@@ -220,150 +225,173 @@ class _SeriesPageState extends ConsumerState<SeriesPage> {
           const SizedBox(width: 6),
         ],
       ),
-      body: items.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('Erreur')),
-        data: (list) {
-          final allGroups = _uniqueGroups(list);
+      body: Stack(
+        children: [
+        if (vmState.items.isEmpty && !vmState.isLoading)
+           const Center(child: Text('Aucune série'))
+        else
+          NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification scrollInfo) {
+              if (!vmState.isLoading && 
+                  vmState.hasMore && 
+                  scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
+                ref.read(seriesVmProvider.notifier).loadNext();
+              }
+              return false;
+            },
+            child: LayoutBuilder(
+              builder: (c, bc) {
+                  final list = vmState.items;
+                  final grouped = _groupBySeries(list);
+                  final favEntries = grouped.entries
+                      .where((e) => _favs.contains(e.key))
+                      .toList();
+                  final otherEntries = grouped.entries
+                      .where((e) => !_favs.contains(e.key))
+                      .toList();
 
-          if (group != null && !allGroups.contains(group)) {
-            WidgetsBinding.instance.addPostFrameCallback((_) async {
-              if (!mounted) return;
-              setState(() => group = null);
-              await _persistGroup(null);
-            });
-          }
+                  Widget buildCard(MapEntry<String, List<IptvItem>> e) {
+                    final episodes = e.value;
+                    final poster = episodes.firstWhere(
+                      (it) => (it.logo ?? '').isNotEmpty,
+                      orElse: () => episodes.first,
+                    );
 
-          final filtered = _filter(list, q, group);
-          if (filtered.isEmpty) {
-            return const Center(child: Text('Aucune série'));
-          }
-
-          final grouped = _groupBySeries(filtered);
-          final favEntries = grouped.entries
-              .where((e) => _favs.contains(e.key))
-              .toList();
-          final otherEntries = grouped.entries
-              .where((e) => !_favs.contains(e.key))
-              .toList();
-
-          Widget buildCard(MapEntry<String, List<IptvItem>> e) {
-            final episodes = e.value;
-            final poster = episodes.firstWhere(
-              (it) => (it.logo ?? '').isNotEmpty,
-              orElse: () => episodes.first,
-            );
-
-            return SeriesCard(
-              title: e.key,
-              posterUrl: poster.logo,
-              count: episodes.length,
-              isFavorite: _favs.contains(e.key),
-              onToggleFavorite: () => _toggleFav(e.key),
-              onTap: () => _openDetails(context, e.key, episodes),
-              actions: SeriesCardActions(
-                onRead: () => _openDetails(context, e.key, episodes),
-                onDetails: () => _showQuickDetails(context, e.key, episodes),
-                onExternal: () => _openExternal(context, episodes),
-                onDownload: () => _download(context, episodes),
-              ),
-            );
-          }
-
-          return Column(
-            children: [
-              _GroupChipsBar(
-                groups: allGroups,
-                selected: group,
-                onSelect: (g) async {
-                  final sel = (g == null || g.isEmpty) ? null : g;
-                  setState(() => group = sel);
-                  await _persistGroup(sel);
-                },
-              ),
-              const Divider(height: 1),
-              if (favEntries.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Favoris',
-                        style: Theme.of(context).textTheme.titleMedium,
+                    return SeriesCard(
+                      title: e.key,
+                      posterUrl: poster.logo,
+                      count: episodes.length,
+                      isFavorite: _favs.contains(e.key),
+                      onToggleFavorite: () => _toggleFav(e.key),
+                      onTap: () => _openDetails(context, e.key, episodes),
+                      actions: SeriesCardActions(
+                        onRead: () => _openDetails(context, e.key, episodes),
+                        onDetails: () => _showQuickDetails(context, e.key, episodes),
+                        onExternal: () => _openExternal(context, episodes),
+                        onDownload: () => _download(context, episodes),
                       ),
-                      const Spacer(),
-                      Text(
-                        '${favEntries.length}',
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  height: 290,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                    );
+                  }
+
+                return Column(
+                  children: [
+                    FutureBuilder<List<String>>(
+                      future: ref.read(seriesVmProvider.notifier).getAvailableGroups(),
+                      builder: (context, snapshot) {
+                        return _GroupChipsBar(
+                          groups: snapshot.data ?? [],
+                          selected: vmState.group,
+                          onSelect: (g) async {
+                            final sel = (g == null || g.isEmpty) ? null : g;
+                            ref.read(seriesVmProvider.notifier).setGroup(sel);
+                            await _persistGroup(sel);
+                          },
+                        );
+                      }
                     ),
-                    scrollDirection: Axis.horizontal,
-                    itemBuilder: (_, i) =>
-                        SizedBox(width: 190, child: buildCard(favEntries[i])),
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
-                    itemCount: favEntries.length,
-                  ),
-                ),
-                const Divider(height: 1),
-              ],
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (c, bc) {
-                    final cross = _crossCountFor(bc.maxWidth);
+                    const Divider(height: 1),
+                    if (favEntries.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Favoris',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${favEntries.length}',
+                              style: Theme.of(context).textTheme.labelMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        height: 290,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          scrollDirection: Axis.horizontal,
+                          itemBuilder: (_, i) =>
+                              SizedBox(width: 190, child: buildCard(favEntries[i])),
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemCount: favEntries.length,
+                        ),
+                      ),
+                      const Divider(height: 1),
+                    ],
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (c, bc) {
+                          final cross = _crossCountFor(bc.maxWidth);
 
-                    if (listMode) {
-                      return ListView.separated(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: otherEntries.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) {
-                          return _SeriesRowTile(
-                            entry: otherEntries[i],
-                            isFavorite: _favs.contains(otherEntries[i].key),
-                            onToggleFavorite: () =>
-                                _toggleFav(otherEntries[i].key),
-                            onRead: () => _openDetails(
-                              context,
-                              otherEntries[i].key,
-                              otherEntries[i].value,
-                            ),
-                            onDetails: () => _showQuickDetails(
-                              context,
-                              otherEntries[i].key,
-                              otherEntries[i].value,
-                            ),
-                            onExternal: () =>
-                                _openExternal(context, otherEntries[i].value),
-                            onDownload: () =>
-                                _download(context, otherEntries[i].value),
+                          if (listMode) {
+                            return ListView.separated(
+                              padding: const EdgeInsets.all(12),
+                              itemCount: otherEntries.length + (vmState.hasMore ? 1 : 0),
+                              separatorBuilder: (_, __) => const SizedBox(height: 10),
+                              itemBuilder: (_, i) {
+                                if (i == otherEntries.length) {
+                                  return const Center(child: Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: CircularProgressIndicator(),
+                                  ));
+                                }
+                                return _SeriesRowTile(
+                                  entry: otherEntries[i],
+                                  isFavorite: _favs.contains(otherEntries[i].key),
+                                  onToggleFavorite: () =>
+                                      _toggleFav(otherEntries[i].key),
+                                  onRead: () => _openDetails(
+                                    context,
+                                    otherEntries[i].key,
+                                    otherEntries[i].value,
+                                  ),
+                                  onDetails: () => _showQuickDetails(
+                                    context,
+                                    otherEntries[i].key,
+                                    otherEntries[i].value,
+                                  ),
+                                  onExternal: () =>
+                                      _openExternal(context, otherEntries[i].value),
+                                  onDownload: () =>
+                                      _download(context, otherEntries[i].value),
+                                );
+                              },
+                            );
+                          }
+
+                          return MasonryGridView.count(
+                            padding: const EdgeInsets.all(12),
+                            crossAxisCount: cross,
+                            mainAxisSpacing: 10,
+                            crossAxisSpacing: 10,
+                            itemCount: otherEntries.length + (vmState.hasMore ? 1 : 0),
+                            itemBuilder: (_, i) {
+                              if (i == otherEntries.length) {
+                                  return const Center(child: Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: CircularProgressIndicator(),
+                                  ));
+                              }
+                              return buildCard(otherEntries[i]);
+                            },
                           );
                         },
-                      );
-                    }
-
-                    return MasonryGridView.count(
-                      padding: const EdgeInsets.all(12),
-                      crossAxisCount: cross,
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 10,
-                      itemCount: otherEntries.length,
-                      itemBuilder: (_, i) => buildCard(otherEntries[i]),
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        },
+                      ),
+                    ),
+                  ],
+                );
+              }
+            )
+          ),
+          
+          if (vmState.isLoading && vmState.items.isEmpty)
+             const Center(child: CircularProgressIndicator()),
+        ]
       ),
     );
   }

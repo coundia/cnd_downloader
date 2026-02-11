@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:isar/isar.dart';
-import '../services/m3u_parser.dart';
+import '../services/isolate_parser.dart';
 import 'iptv_models.dart';
 import 'db.dart';
 import '../core/settings.dart';
@@ -9,20 +9,96 @@ import '../core/settings.dart';
 class IptvRepository {
   final Isar _isar = AppDb.isar;
   final Dio _dio;
-  final M3uParser _parser = M3uParser();
 
   IptvRepository(this._dio);
 
-  Stream<List<IptvItem>> watchLive() =>
-      _isar.iptvItems.filter().kindEqualTo('live').watch(fireImmediately: true);
-  Stream<List<IptvItem>> watchMovies() => _isar.iptvItems
-      .filter()
-      .kindEqualTo('movie')
-      .watch(fireImmediately: true);
-  Stream<List<IptvItem>> watchSeries() => _isar.iptvItems
-      .filter()
-      .kindEqualTo('series')
-      .watch(fireImmediately: true);
+  // Deprecated: watchLive/watchMovies/watchSeries cause full re-renders of large lists.
+  // Use paginated methods instead. 
+  
+  Future<List<IptvItem>> findItems({
+    required String kind,
+    int offset = 0,
+    int limit = 50,
+    String query = '',
+    String? group,
+    String? host,
+    String sortKey = 'Name',
+    bool sortAsc = true,
+  }) async {
+    var q = _isar.iptvItems.filter().kindEqualTo(kind);
+
+    if (query.trim().isNotEmpty) {
+      final term = query.trim();
+      q = q.and().group((q) => q
+          .nameContains(term, caseSensitive: false)
+          .or()
+          .groupTitleContains(term, caseSensitive: false));
+    }
+    
+    if (group != null && group.isNotEmpty) {
+      q = q.and().groupTitleEqualTo(group);
+    }
+
+    if (host != null && host.isNotEmpty) {
+      q = q.and().hostEqualTo(host);
+    }
+    
+    // Sorting
+    QueryBuilder<IptvItem, IptvItem, QAfterSortBy> sorted;
+    switch (sortKey) {
+      case 'Group':
+        sorted = sortAsc 
+            ? q.sortByGroupTitle() 
+            : q.sortByGroupTitleDesc();
+        break;
+      case 'Host':
+        sorted = sortAsc 
+            ? q.sortByHost() 
+            : q.sortByHostDesc();
+        break;
+      case 'Rating':
+         sorted = sortAsc 
+            ? q.sortByImdbRating() 
+            : q.sortByImdbRatingDesc();
+        break;
+      case 'Name':
+      default:
+        sorted = sortAsc 
+            ? q.sortByName() 
+            : q.sortByNameDesc();
+        break;
+    }
+    
+    return sorted.offset(offset).limit(limit).findAll();
+  }
+
+  Future<List<String>> getGroups(String kind) async {
+    final groups = await _isar.iptvItems
+        .filter()
+        .kindEqualTo(kind)
+        .groupTitleProperty()
+        .findAll();
+    // Filter nulls and empty and distinct
+    return groups
+        .where((e) => e != null && e.isNotEmpty)
+        .map((e) => e!)
+        .toSet()
+        .toList()
+      ..sort();
+  }
+
+  Future<List<String>> getHosts(String kind) async {
+    final hosts = await _isar.iptvItems
+        .filter()
+        .kindEqualTo(kind)
+        .hostProperty()
+        .findAll();
+    return hosts
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+  }
 
   Future<int> addM3uSource(String name, String url) async {
     final src = IptvSource()
@@ -54,64 +130,15 @@ class IptvRepository {
     if (src == null || src.url == null) return;
 
     final data = await _fetch(src.url!);
-    final doc = _parser.parseDocument(data);
-
-    src.urlTvg = doc.header['url-tvg'] ?? src.urlTvg;
-    src.provider = doc.header['provider-name'] ?? src.provider;
-
-    final items = <IptvItem>[];
-    for (final e in doc.entries) {
-      final u = Uri.tryParse(e.url);
-      final host = u?.host ?? '';
-      final scheme = u?.scheme;
-      final path = u?.path;
-      final ext = path != null && path.contains('.')
-          ? path.split('.').last.toLowerCase()
-          : null;
-
-      final headers = <String, String>{};
-      if ((e.userAgent ?? '').isNotEmpty) headers['user-agent'] = e.userAgent!;
-      if ((e.referer ?? '').isNotEmpty) headers['referer'] = e.referer!;
-      if ((settings.defaultUserAgent).trim().isNotEmpty &&
-          headers['user-agent'] == null) {
-        headers['user-agent'] = settings.defaultUserAgent.trim();
-      }
-      if ((settings.defaultReferer ?? '').trim().isNotEmpty &&
-          headers['referer'] == null) {
-        headers['referer'] = settings.defaultReferer!.trim();
-      }
-      final headersJson = headers.isEmpty ? null : jsonEncode(headers);
-
-      final it = IptvItem()
-        ..sourceId = sourceId
-        ..kind = e.kind
-        ..name = e.name
-        ..nameOriginal = e.nameOriginal
-        ..groupTitle = e.group
-        ..tvgId = e.tvgId
-        ..tvgName = e.tvgName
-        ..logo = e.logo
-        ..country = e.country
-        ..language = e.language
-        ..chno = e.chno
-        ..catchup = e.catchup
-        ..catchupSource = e.catchupSource
-        ..catchupDays = e.catchupDays
-        ..epgShift = e.epgShift
-        ..userAgent = e.userAgent
-        ..referer = e.referer
-        ..headersJson = headersJson
-        ..host = host
-        ..scheme = scheme
-        ..path = path
-        ..ext = ext
-        ..imdbId = e.imdbId
-        ..imdbRating = e.imdbRating
-        ..imdbDescription = e.imdbDescription
-        ..streamUrl = e.url;
-
-      items.add(it);
-    }
+    // M3uParser logic moved to isolate helper
+    
+    // Need access to settings, passing them as arguments
+    final items = await parseM3uInIsolate(
+      data, 
+      sourceId, 
+      defaultUserAgent: settings.defaultUserAgent,
+      defaultReferer: settings.defaultReferer
+    );
 
     await _isar.writeTxn(() async {
       final oldIds = await _isar.iptvItems

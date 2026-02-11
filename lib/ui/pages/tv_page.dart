@@ -34,8 +34,9 @@ class _TvPageState extends ConsumerState<TvPage> {
 
   @override
   Widget build(BuildContext context) {
-    final items = ref.watch(liveProvider);
-    final vmState = ref.watch(iptvVmProvider);
+    // Watch the paginated state
+    final vmState = ref.watch(liveVmProvider);
+    final iptvState = ref.watch(iptvVmProvider);
 
     final cs = Theme.of(context).colorScheme;
 
@@ -63,6 +64,7 @@ class _TvPageState extends ConsumerState<TvPage> {
                 : () {
                     _searchCtrl.clear();
                     setState(() => q = '');
+                    ref.read(liveVmProvider.notifier).setQuery('');
                     _searchFocus.requestFocus();
                   },
             icon: const Icon(Icons.close),
@@ -75,34 +77,20 @@ class _TvPageState extends ConsumerState<TvPage> {
             child: _SearchField(
               controller: _searchCtrl,
               focusNode: _searchFocus,
-              onChanged: (v) => setState(() => q = v.trim().toLowerCase()),
+              onChanged: (v) {
+                final val = v.trim().toLowerCase();
+                setState(() => q = val);
+                // Debounce could be added here
+                ref.read(liveVmProvider.notifier).setQuery(val);
+              },
             ),
           ),
         ),
       ),
       body: Stack(
         children: [
-          items.when(
-            loading: () => const _PageLoading(),
-            error: (_, __) => const _PageError(),
-            data: (list) {
-              final filtered = q.isEmpty
-                  ? list
-                  : list
-                        .where(
-                          (e) => ('${e.name} ${e.groupTitle ?? ''}')
-                              .toLowerCase()
-                              .contains(q),
-                        )
-                        .toList();
-
-              final favIds = ref.watch(favoritesProvider);
-              final favItems = filtered
-                  .where((e) => favIds.contains(e.id))
-                  .toList();
-
-              if (filtered.isEmpty) {
-                return _EmptyState(
+          if (vmState.items.isEmpty && !vmState.isLoading)
+             _EmptyState(
                   title: 'Aucune chaîne',
                   subtitle: q.isEmpty
                       ? 'Ajoutez une source IPTV ou vérifiez votre connexion.'
@@ -113,12 +101,21 @@ class _TvPageState extends ConsumerState<TvPage> {
                       : () {
                           _searchCtrl.clear();
                           setState(() => q = '');
+                          ref.read(liveVmProvider.notifier).setQuery('');
                           _searchFocus.requestFocus();
                         },
-                );
-              }
-
-              return LayoutBuilder(
+                )
+          else
+            NotificationListener<ScrollNotification>(
+              onNotification: (ScrollNotification scrollInfo) {
+                if (!vmState.isLoading && 
+                    vmState.hasMore && 
+                    scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
+                  ref.read(liveVmProvider.notifier).loadNext();
+                }
+                return false;
+              },
+              child: LayoutBuilder(
                 builder: (c, bc) {
                   final w = bc.maxWidth;
                   final cross = w >= 1600
@@ -131,184 +128,83 @@ class _TvPageState extends ConsumerState<TvPage> {
                       ? 3
                       : 2;
 
-                  Widget favSliver() {
-                    if (listMode) {
-                      return SliverList(
-                        delegate: SliverChildBuilderDelegate((ctx, i) {
-                          final it = favItems[i];
-                          final isFav = favIds.contains(it.id);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _ChannelCard(
-                              item: it,
-                              isFavorite: isFav,
-                              compact: true,
-                              onToggleFavorite: () => ref
-                                  .read(favoritesProvider.notifier)
-                                  .toggle(it.id),
-                              onPlay: () => _openPlayer(it),
-                              onCopy: () => _copyUrl(context, it),
-                            ),
-                          );
-                        }, childCount: favItems.length),
-                      );
-                    }
+                  final items = vmState.items;
+                  final favIds = ref.watch(favoritesProvider);
+                  // We show all items from pagination. Favorites logic might need adjustment if we want them pinned top,
+                  // but with pagination, pinning top across all pages is hard without fetching all.
+                  // For now, we just show the list as is (favorites marked).
+                  // Todo: Add "Favorites Only" filter in VM if needed.
 
-                    return SliverGrid(
-                      delegate: SliverChildBuilderDelegate((ctx, i) {
-                        final it = favItems[i];
+                  if (listMode) {
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: items.length + (vmState.hasMore ? 1 : 0),
+                      itemBuilder: (ctx, i) {
+                        if (i == items.length) {
+                          return const Center(child: Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: CircularProgressIndicator(),
+                          ));
+                        }
+                        final it = items[i];
                         final isFav = favIds.contains(it.id);
-                        return _ChannelCard(
-                          item: it,
-                          isFavorite: isFav,
-                          compact: w < 480,
-                          onToggleFavorite: () => ref
-                              .read(favoritesProvider.notifier)
-                              .toggle(it.id),
-                          onPlay: () => _openPlayer(it),
-                          onCopy: () => _copyUrl(context, it),
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _ChannelCard(
+                            item: it,
+                            isFavorite: isFav,
+                            compact: true,
+                            onToggleFavorite: () => ref
+                                .read(favoritesProvider.notifier)
+                                .toggle(it.id),
+                            onPlay: () => _openPlayer(it),
+                            onCopy: () => _copyUrl(context, it),
+                          ),
                         );
-                      }, childCount: favItems.length),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: cross,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 2.8,
-                      ),
+                      },
                     );
                   }
 
-                  Widget allSliver() {
-                    if (listMode) {
-                      return SliverList(
-                        delegate: SliverChildBuilderDelegate((ctx, i) {
-                          final it = filtered[i];
-                          final isFav = favIds.contains(it.id);
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _ChannelCard(
-                              item: it,
-                              isFavorite: isFav,
-                              compact: true,
-                              onToggleFavorite: () => ref
-                                  .read(favoritesProvider.notifier)
-                                  .toggle(it.id),
-                              onPlay: () => _openPlayer(it),
-                              onCopy: () => _copyUrl(context, it),
-                            ),
-                          );
-                        }, childCount: filtered.length),
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: cross,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 2.8,
+                    ),
+                    itemCount: items.length + (vmState.hasMore ? 1 : 0),
+                    itemBuilder: (ctx, i) {
+                       if (i == items.length) {
+                          return const Center(child: Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: CircularProgressIndicator(),
+                          ));
+                        }
+                      final it = items[i];
+                      final isFav = favIds.contains(it.id);
+                      return _ChannelCard(
+                        item: it,
+                        isFavorite: isFav,
+                        compact: w < 480,
+                        onToggleFavorite: () => ref
+                            .read(favoritesProvider.notifier)
+                            .toggle(it.id),
+                        onPlay: () => _openPlayer(it),
+                        onCopy: () => _copyUrl(context, it),
                       );
-                    }
-
-                    return SliverGrid(
-                      delegate: SliverChildBuilderDelegate((ctx, i) {
-                        final it = filtered[i];
-                        final isFav = favIds.contains(it.id);
-                        return _ChannelCard(
-                          item: it,
-                          isFavorite: isFav,
-                          compact: w < 480,
-                          onToggleFavorite: () => ref
-                              .read(favoritesProvider.notifier)
-                              .toggle(it.id),
-                          onPlay: () => _openPlayer(it),
-                          onCopy: () => _copyUrl(context, it),
-                        );
-                      }, childCount: filtered.length),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: cross,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 2.8,
-                      ),
-                    );
-                  }
-
-                  return CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _CountChip(
-                                label: 'Chaînes',
-                                value: filtered.length,
-                                icon: Icons.live_tv,
-                              ),
-                              _CountChip(
-                                label: 'Favoris',
-                                value: favItems.length,
-                                icon: Icons.star,
-                              ),
-                              if (q.isNotEmpty)
-                                ActionChip(
-                                  avatar: const Icon(
-                                    Icons.filter_alt,
-                                    size: 18,
-                                  ),
-                                  label: Text('“${_searchCtrl.text.trim()}”'),
-                                  onPressed: () => _searchFocus.requestFocus(),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (favItems.isNotEmpty) ...[
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-                          sliver: SliverToBoxAdapter(
-                            child: _SectionHeader(
-                              title: 'Favoris',
-                              trailing: Text(
-                                '${favItems.length}',
-                                style: Theme.of(context).textTheme.labelMedium
-                                    ?.copyWith(color: cs.onSurfaceVariant),
-                              ),
-                            ),
-                          ),
-                        ),
-                        SliverPadding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          sliver: favSliver(),
-                        ),
-                        const SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(12, 12, 12, 6),
-                            child: Divider(height: 1),
-                          ),
-                        ),
-                      ],
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-                        sliver: SliverToBoxAdapter(
-                          child: _SectionHeader(
-                            title: 'Toutes les chaînes',
-                            trailing: Text(
-                              '${filtered.length}',
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        sliver: allSliver(),
-                      ),
-                      const SliverToBoxAdapter(child: SizedBox(height: 12)),
-                    ],
+                    },
                   );
                 },
-              );
-            },
-          ),
+              ),
+            ),
+          
+          if (vmState.isLoading && vmState.items.isEmpty)
+             const _PageLoading(),
+
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
-            child: vmState.isLoading
+            child: iptvState.isLoading
                 ? const Align(
                     alignment: Alignment.topCenter,
                     child: LinearProgressIndicator(minHeight: 2),

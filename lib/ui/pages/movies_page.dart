@@ -140,7 +140,8 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final items = ref.watch(moviesProvider);
+    final vmState = ref.watch(moviesVmProvider);
+    final iptvState = ref.watch(iptvVmProvider);
     final favIds = ref.watch(favoritesProvider);
 
     return Scaffold(
@@ -168,110 +169,165 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
           const SizedBox(width: 6),
         ],
       ),
-      body: items.when(
-        loading: () => const _PageLoading(),
-        error: (_, __) => const _PageError(),
-        data: (list) {
-          final allGroups = _uniqueGroups(list);
-          final allHosts = _uniqueHosts(list);
-
-          if (group != null && !allGroups.contains(group)) {
-            WidgetsBinding.instance.addPostFrameCallback((_) async {
-              if (!mounted) return;
-              setState(() => group = null);
-              await _persistGroup(null);
-            });
-          }
-
-          final ql = q.toLowerCase().trim();
-          final filtered = list.where((e) {
-            final hitQuery =
-                ql.isEmpty ||
-                ('${e.name} ${e.groupTitle ?? ''}').toLowerCase().contains(ql);
-
-            final hitGroup =
-                (group == null || group!.isEmpty) ||
-                (e.groupTitle ?? 'Other') == group;
-
-            final h = _safeHost(e.streamUrl);
-            final hitHost = (host == null || host!.isEmpty) || h == host;
-
-            return hitQuery && hitGroup && hitHost;
-          }).toList();
-
-          _sortInPlace(filtered, sortKey, sortAsc);
-
-          final favItems = filtered
-              .where((e) => favIds.contains(e.id))
-              .toList();
-          final otherItems = filtered
-              .where((e) => !favIds.contains(e.id))
-              .toList();
-
-          final onToggleFav = (IptvItem it) =>
-              ref.read(favoritesProvider.notifier).toggle(it.id);
-
-          return LayoutBuilder(
-            builder: (c, bc) {
-              final cross = _crossCountFor(bc.maxWidth);
-
-              return Column(
-                children: [
-                  SearchFilterBar(
-                    query: q,
-                    onQuery: (v) => setState(() => q = v),
-                    groups: allGroups,
-                    selectedGroup: group,
-                    onSelectGroup: (v) async {
-                      final sel = (v == null || v.isEmpty) ? null : v;
-                      setState(() => group = sel);
-                      await _persistGroup(sel);
-                    },
-                    hosts: allHosts,
-                    selectedHost: host,
-                    onSelectHost: (v) => setState(() => host = v),
-                    sortKeys: const ['Name', 'Group', 'Host', 'Rating'],
-                    selectedSortKey: sortKey,
-                    onSelectSortKey: (v) =>
-                        setState(() => sortKey = v ?? 'Name'),
-                    sortAsc: sortAsc,
-                    onToggleAsc: () => setState(() => sortAsc = !sortAsc),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-                    child: _StatsRow(
-                      total: filtered.length,
-                      fav: favItems.length,
-                      query: q,
+      body: Stack(
+        children: [
+        if (vmState.items.isEmpty && !vmState.isLoading)
+             const _EmptyState()
+        else
+          NotificationListener<ScrollNotification>(
+            onNotification: (ScrollNotification scrollInfo) {
+              if (!vmState.isLoading && 
+                  vmState.hasMore && 
+                  scrollInfo.metrics.pixels >= scrollInfo.metrics.maxScrollExtent - 200) {
+                ref.read(moviesVmProvider.notifier).loadNext();
+              }
+              return false;
+            },
+            child: LayoutBuilder(
+              builder: (c, bc) {
+                final cross = _crossCountFor(bc.maxWidth);
+                final items = vmState.items;
+                
+                final favItems = items
+                  .where((e) => favIds.contains(e.id))
+                  .toList();
+                final otherItems = items
+                  .where((e) => !favIds.contains(e.id))
+                  .toList();
+                  
+                return Column(
+                  children: [
+                    // We need FutureBuilders for aggregates since we can't derive them easily from partial list
+                    FutureBuilder<List<String>>(
+                      future: ref.read(moviesVmProvider.notifier).getAvailableGroups(),
+                      builder: (context, snapshotGroups) {
+                        return FutureBuilder<List<String>>(
+                           future: ref.read(moviesVmProvider.notifier).getAvailableHosts(),
+                           builder: (context, snapshotHosts) {
+                             return SearchFilterBar(
+                                query: vmState.query,
+                                onQuery: (v) => ref.read(moviesVmProvider.notifier).setQuery(v),
+                                groups: snapshotGroups.data ?? [],
+                                selectedGroup: vmState.group,
+                                onSelectGroup: (v) async {
+                                  final sel = (v == null || v.isEmpty) ? null : v;
+                                  ref.read(moviesVmProvider.notifier).setGroup(sel);
+                                  await _persistGroup(sel);
+                                },
+                                hosts: snapshotHosts.data ?? [],
+                                selectedHost: vmState.host,
+                                onSelectHost: (v) => ref.read(moviesVmProvider.notifier).setHost(v),
+                                sortKeys: const ['Name', 'Group', 'Host', 'Rating'],
+                                selectedSortKey: vmState.sortKey,
+                                onSelectSortKey: (v) =>
+                                    ref.read(moviesVmProvider.notifier).setSort(v ?? 'Name', vmState.sortAsc),
+                                sortAsc: vmState.sortAsc,
+                                onToggleAsc: () => ref.read(moviesVmProvider.notifier).setSort(vmState.sortKey, !vmState.sortAsc),
+                              );
+                           }
+                        );
+                      }
                     ),
-                  ),
-                  _GroupChipsBar(
-                    groups: allGroups,
-                    selected: group,
-                    onSelect: (g) async {
-                      final sel = (g == null || g.isEmpty) ? null : g;
-                      setState(() => group = sel);
-                      await _persistGroup(sel);
-                    },
-                  ),
-                  const Divider(height: 1),
-                  Expanded(
-                    child: filtered.isEmpty
-                        ? const _EmptyState()
-                        : CustomScrollView(
-                            slivers: [
-                              if (favItems.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                      child: _StatsRow(
+                        total: items.length, // Showing cached count
+                        fav: favItems.length,
+                        query: vmState.query,
+                      ),
+                    ),
+                    // Group chips logic is duplicated from filter bar, skipping here or keeping if useful.
+                    // The _GroupChipsBar was useful for quick access. 
+                    // We can reuse the FutureBuilder result if we refactored, but for now simple:
+                     FutureBuilder<List<String>>(
+                      future: ref.read(moviesVmProvider.notifier).getAvailableGroups(),
+                      builder: (context, snapshot) {
+                        return _GroupChipsBar(
+                          groups: snapshot.data ?? [],
+                          selected: vmState.group,
+                          onSelect: (g) async {
+                            final sel = (g == null || g.isEmpty) ? null : g;
+                            ref.read(moviesVmProvider.notifier).setGroup(sel);
+                            await _persistGroup(sel);
+                          },
+                        );
+                      }
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: vmState.items.isEmpty
+                          ? const _EmptyState()
+                          : CustomScrollView(
+                              slivers: [
+                                if (favItems.isNotEmpty) ...[
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      12,
+                                      12,
+                                      12,
+                                      6,
+                                    ),
+                                    sliver: SliverToBoxAdapter(
+                                      child: _SectionHeader(
+                                        title: 'Favoris',
+                                        count: favItems.length,
+                                      ),
+                                    ),
+                                  ),
+                                  SliverPadding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    sliver: listMode
+                                        ? _MoviesSliverList(
+                                            items: favItems,
+                                            isFavorite: (_) => true,
+                                            onToggleFavorite: (it) => ref.read(favoritesProvider.notifier).toggle(it.id),
+                                            onRead: (it) =>
+                                                _openDetailsPage(context, it),
+                                            onDetails: (it) =>
+                                                _showQuickDetails(context, it),
+                                            onExternal: (it) =>
+                                                _openExternal(context, it),
+                                            onDownload: (it) =>
+                                                _download(context, it),
+                                          )
+                                        : _MoviesSliverMasonryGrid(
+                                            items: favItems,
+                                            cross: cross,
+                                            isFavorite: (_) => true,
+                                            onToggleFavorite: (it) => ref.read(favoritesProvider.notifier).toggle(it.id),
+                                            onRead: (it) =>
+                                                _openDetailsPage(context, it),
+                                            onDetails: (it) =>
+                                                _showQuickDetails(context, it),
+                                            onExternal: (it) =>
+                                                _openExternal(context, it),
+                                            onDownload: (it) =>
+                                                _download(context, it),
+                                          ),
+                                  ),
+                                  const SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                      child: Divider(height: 1),
+                                    ),
+                                  ),
+                                ],
                                 SliverPadding(
                                   padding: const EdgeInsets.fromLTRB(
                                     12,
-                                    12,
+                                    8,
                                     12,
                                     6,
                                   ),
                                   sliver: SliverToBoxAdapter(
                                     child: _SectionHeader(
-                                      title: 'Favoris',
-                                      count: favItems.length,
+                                      title: 'Tous les films',
+                                      count: otherItems.length,
                                     ),
                                   ),
                                 ),
@@ -281,9 +337,10 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                                   ),
                                   sliver: listMode
                                       ? _MoviesSliverList(
-                                          items: favItems,
-                                          isFavorite: (_) => true,
-                                          onToggleFavorite: onToggleFav,
+                                          items: otherItems,
+                                          isFavorite: (it) =>
+                                              favIds.contains(it.id),
+                                          onToggleFavorite: (it) => ref.read(favoritesProvider.notifier).toggle(it.id),
                                           onRead: (it) =>
                                               _openDetailsPage(context, it),
                                           onDetails: (it) =>
@@ -294,10 +351,11 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                                               _download(context, it),
                                         )
                                       : _MoviesSliverMasonryGrid(
-                                          items: favItems,
+                                          items: otherItems,
                                           cross: cross,
-                                          isFavorite: (_) => true,
-                                          onToggleFavorite: onToggleFav,
+                                          isFavorite: (it) =>
+                                              favIds.contains(it.id),
+                                          onToggleFavorite: (it) => ref.read(favoritesProvider.notifier).toggle(it.id),
                                           onRead: (it) =>
                                               _openDetailsPage(context, it),
                                           onDetails: (it) =>
@@ -308,76 +366,36 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
                                               _download(context, it),
                                         ),
                                 ),
+                                if (vmState.hasMore)
+                                   const SliverToBoxAdapter(child: Center(child: Padding(
+                                     padding: EdgeInsets.all(16.0),
+                                     child: CircularProgressIndicator(),
+                                   ))),
                                 const SliverToBoxAdapter(
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
-                                    child: Divider(height: 1),
-                                  ),
+                                  child: SizedBox(height: 12),
                                 ),
                               ],
-                              SliverPadding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  8,
-                                  12,
-                                  6,
-                                ),
-                                sliver: SliverToBoxAdapter(
-                                  child: _SectionHeader(
-                                    title: 'Tous les films',
-                                    count: otherItems.length,
-                                  ),
-                                ),
-                              ),
-                              SliverPadding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                sliver: listMode
-                                    ? _MoviesSliverList(
-                                        items: otherItems,
-                                        isFavorite: (it) =>
-                                            favIds.contains(it.id),
-                                        onToggleFavorite: onToggleFav,
-                                        onRead: (it) =>
-                                            _openDetailsPage(context, it),
-                                        onDetails: (it) =>
-                                            _showQuickDetails(context, it),
-                                        onExternal: (it) =>
-                                            _openExternal(context, it),
-                                        onDownload: (it) =>
-                                            _download(context, it),
-                                      )
-                                    : _MoviesSliverMasonryGrid(
-                                        items: otherItems,
-                                        cross: cross,
-                                        isFavorite: (it) =>
-                                            favIds.contains(it.id),
-                                        onToggleFavorite: onToggleFav,
-                                        onRead: (it) =>
-                                            _openDetailsPage(context, it),
-                                        onDetails: (it) =>
-                                            _showQuickDetails(context, it),
-                                        onExternal: (it) =>
-                                            _openExternal(context, it),
-                                        onDownload: (it) =>
-                                            _download(context, it),
-                                      ),
-                              ),
-                              const SliverToBoxAdapter(
-                                child: SizedBox(height: 12),
-                              ),
-                            ],
-                          ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          
+          if (vmState.isLoading && vmState.items.isEmpty)
+             const _PageLoading(),
+          
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: iptvState.isLoading
+                ? const Align(
+                    alignment: Alignment.topCenter,
+                    child: LinearProgressIndicator(minHeight: 2),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ]
       ),
     );
   }
@@ -396,57 +414,12 @@ class _MoviesPageState extends ConsumerState<MoviesPage> {
         : 2;
   }
 
-  List<String> _uniqueGroups(List<IptvItem> list) {
-    final set = SplayTreeSet<String>();
-    for (final e in list) {
-      set.add((e.groupTitle ?? 'Other').trim());
-    }
-    return [''].followedBy(set).toList();
-  }
-
-  List<String> _uniqueHosts(List<IptvItem> list) {
-    final set = SplayTreeSet<String>();
-    for (final e in list) {
-      final h = _safeHost(e.streamUrl);
-      if (h.isNotEmpty) set.add(h);
-    }
-    return [''].followedBy(set).toList();
-  }
-
   String _safeHost(String url) {
     try {
       return Uri.parse(url).host;
     } catch (_) {
       return '';
     }
-  }
-
-  void _sortInPlace(List<IptvItem> list, String key, bool asc) {
-    int cmp(IptvItem a, IptvItem b) {
-      int r;
-      switch (key) {
-        case 'Group':
-          r = (a.groupTitle ?? 'Other').toLowerCase().compareTo(
-            (b.groupTitle ?? 'Other').toLowerCase(),
-          );
-          break;
-        case 'Host':
-          r = _safeHost(
-            a.streamUrl,
-          ).toLowerCase().compareTo(_safeHost(b.streamUrl).toLowerCase());
-          break;
-        case 'Rating':
-          final ar = a.imdbRating ?? -1.0;
-          final br = b.imdbRating ?? -1.0;
-          r = ar.compareTo(br);
-          break;
-        default:
-          r = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-      }
-      return asc ? r : -r;
-    }
-
-    list.sort(cmp);
   }
 }
 
@@ -748,7 +721,6 @@ class _MovieRowTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 6),
               IconButton(
                 tooltip: favorite
                     ? 'Retirer des favoris'
@@ -791,89 +763,102 @@ class _MovieCardGrid extends StatelessWidget {
 
     return InkWell(
       onTap: onRead,
-      borderRadius: BorderRadius.circular(14),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 2 / 3,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if ((poster ?? '').isNotEmpty)
-                    Image.network(
-                      poster!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const ColoredBox(color: Color(0xFF111111)),
-                    )
-                  else
-                    const ColoredBox(color: Color(0xFF111111)),
-                  Positioned(
-                    left: 8,
-                    top: 8,
-                    child: Material(
-                      color: Colors.black.withOpacity(0.35),
-                      shape: const CircleBorder(),
-                      child: IconButton(
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(7),
-                        iconSize: 18,
-                        tooltip: favorite
-                            ? 'Retirer des favoris'
-                            : 'Ajouter aux favoris',
-                        onPressed: onToggleFavorite,
-                        icon: Icon(
-                          favorite ? Icons.star : Icons.star_border,
-                          color: favorite ? Colors.amber : Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 8,
-                    right: 8,
-                    bottom: 8,
-                    child: _GridActionsBar(
-                      onRead: onRead,
-                      onDetails: onDetails,
-                      onExternal: onExternal,
-                      onDownload: onDownload,
-                    ),
-                  ),
-                ],
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 2 / 3,
+                  child: (poster ?? '').isNotEmpty
+                      ? Image.network(
+                          poster!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const ColoredBox(color: Color(0xFF111111)),
+                        )
+                      : const ColoredBox(color: Color(0xFF111111)),
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.name,
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      height: 1.15,
+              Positioned(
+                top: 4,
+                right: 4,
+                child: IconButton(
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black45,
+                    foregroundColor: Colors.white,
+                  ),
+                  tooltip: favorite
+                      ? 'Retirer des favoris'
+                      : 'Ajouter aux favoris',
+                  onPressed: onToggleFavorite,
+                  icon: Icon(
+                    favorite ? Icons.star : Icons.star_border,
+                    size: 18,
+                  ),
+                  color: favorite ? Colors.amber : Colors.white,
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [Colors.black87, Colors.transparent],
+                    ),
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  child: _GridActionsBar(
+                    onRead: onRead,
+                    onDetails: onDetails,
+                    onExternal: onExternal,
+                    onDownload: onDownload,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    height: 1.2,
+                  ),
+                ),
+                if (item.groupTitle != null)
                   Text(
                     item.groupTitle ?? '',
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey,
+                    ),
                   ),
-                ],
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -894,33 +879,26 @@ class _GridActionsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withOpacity(0.48),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _IconMini(icon: Icons.menu_book, tooltip: 'Lire', onTap: onRead),
-            _IconMini(
-              icon: Icons.info_outline,
-              tooltip: 'Détails',
-              onTap: onDetails,
-            ),
-            _IconMini(
-              icon: Icons.open_in_new,
-              tooltip: 'Externe',
-              onTap: onExternal,
-            ),
-            _IconMini(
-              icon: Icons.download,
-              tooltip: 'Télécharger',
-              onTap: onDownload,
-            ),
-          ],
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _IconMini(icon: Icons.menu_book, tooltip: 'Lire', onTap: onRead),
+        _IconMini(
+          icon: Icons.info_outline,
+          tooltip: 'Détails',
+          onTap: onDetails,
         ),
-      ),
+        _IconMini(
+          icon: Icons.open_in_new,
+          tooltip: 'Ouvrir externe',
+          onTap: onExternal,
+        ),
+        _IconMini(
+          icon: Icons.download,
+          tooltip: 'Télécharger',
+          onTap: onDownload,
+        ),
+      ],
     );
   }
 }
@@ -939,23 +917,18 @@ class _TinyAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
-    return Material(
-      color: cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18, color: cs.onSurfaceVariant),
-              const SizedBox(width: 6),
-              Text(label, style: Theme.of(context).textTheme.labelMedium),
-            ],
-          ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18, color: cs.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(label, style: Theme.of(context).textTheme.labelMedium),
+          ],
         ),
       ),
     );
@@ -976,11 +949,11 @@ class _IconMini extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      tooltip: tooltip,
-      onPressed: onTap,
-      iconSize: 18,
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
+      tooltip: tooltip,
+      onPressed: onTap,
+      iconSize: 20,
       icon: Icon(icon, color: Colors.white),
     );
   }
@@ -998,7 +971,7 @@ class _PageError extends StatelessWidget {
   const _PageError();
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('Error'));
+    return const Center(child: Text('Erreur de chargement'));
   }
 }
 
@@ -1006,31 +979,17 @@ class _EmptyState extends StatelessWidget {
   const _EmptyState();
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.search_off, size: 44),
-              const SizedBox(height: 12),
-              Text(
-                'Aucun film',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Modifiez la recherche ou les filtres.',
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.movie_outlined, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text(
+            'Aucun film trouvé',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
-        ),
+        ],
       ),
     );
   }
