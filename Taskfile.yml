@@ -1,0 +1,17 @@
+version: '3'
+
+tasks:
+  run:
+    desc: Run the Flutter app on macOS
+    cmds:
+      - flutter run -d macos
+
+  build:
+    desc: Run the build_runner to generate code
+    cmds:
+      - dart run build_runner build --delete-conflicting-outputs
+
+  default:
+    desc: Run the app
+    cmds:
+      - task: run

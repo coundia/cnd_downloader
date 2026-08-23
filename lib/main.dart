@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'app.dart';
 import 'data/db.dart';
+import 'ui/widgets/app_restart_scope.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,5 +14,5 @@ void main() async {
     linux: true,
   );
 
-  runApp(const ProviderScope(child: FastDownApp()));
+  runApp(const AppRestartScope(child: ProviderScope(child: FastDownApp())));
 }

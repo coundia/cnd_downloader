@@ -2,6 +2,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../widgets/app_restart_scope.dart';
 import '../../viewmodels/settings_vm.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -184,6 +185,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text('Save'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _saving
+                  ? null
+                  : () {
+                      FocusScope.of(context).unfocus();
+                      AppRestartScope.restartApp(context);
+                    },
+              icon: const Icon(Icons.restart_alt),
+              label: const Text('Reload app'),
             ),
           ],
         ),
